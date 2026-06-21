@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Droplets, MapPin, Clock, MessageSquare, Check, X, ArrowLeft, Camera, Sparkles } from 'lucide-react';
-import { useAddRecord, useUpdateRecord, useRecords, useAddPhoto, useGetPhotosByRecordId, usePhotos, useAppStore } from '../store/useAppStore';
+import { useAddRecord, useUpdateRecord, useRecords, useAddPhoto, useGetPhotosByRecordId, usePhotos, useAppStore, useDeletePhoto, useUpdatePhoto } from '../store/useAppStore';
 import { useRoadList } from '../hooks/usePredictions';
 import { Button } from '../components/Button';
 import { Card, CardContent } from '../components/Card';
@@ -26,6 +26,8 @@ export default function Record() {
   const records = useRecords();
   const roadList = useRoadList();
   const addPhoto = useAddPhoto();
+  const deletePhoto = useDeletePhoto();
+  const updatePhoto = useUpdatePhoto();
   const getPhotosByRecordId = useGetPhotosByRecordId();
   const allPhotos = usePhotos();
 
@@ -137,13 +139,34 @@ export default function Record() {
         recordId = recordsNow[0]?.id || id || '';
       }
 
-      if (tempPhotos.length > 0 && recordId) {
+      if (recordId) {
+        const existingPhotoIds = new Set(
+          existingPhotos.map((p) => p.id)
+        );
+        const keptPhotoIds = new Set(
+          tempPhotos
+            .filter((tp) => !tp.tempId.startsWith('temp_'))
+            .map((tp) => tp.tempId)
+        );
+
+        const deletedPhotoIds = [...existingPhotoIds].filter(
+          (pid) => !keptPhotoIds.has(pid)
+        );
+        deletedPhotoIds.forEach((pid) => deletePhoto(pid));
+
         tempPhotos.forEach((tp) => {
           const { tempId, ...photoData } = tp;
-          addPhoto({
-            ...photoData,
-            recordId,
-          });
+          if (tempId.startsWith('temp_')) {
+            addPhoto({
+              ...photoData,
+              recordId,
+            });
+          } else {
+            updatePhoto(tempId, {
+              ...photoData,
+              recordId,
+            });
+          }
         });
       }
 

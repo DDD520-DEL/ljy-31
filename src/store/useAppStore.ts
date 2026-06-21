@@ -145,8 +145,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   deleteRecord: (id) => {
     set((state) => {
       const newRecords = state.records.filter((record) => record.id !== id);
+      const newPhotos = state.photos.filter((photo) => photo.recordId !== id);
       storage.set(StorageKeys.RECORDS, newRecords);
-      return { records: newRecords };
+      storage.set(StorageKeys.PHOTOS, newPhotos);
+      return {
+        records: newRecords,
+        photos: newPhotos,
+        storageInfo: generateStorageInfo(newPhotos),
+      };
     });
 
     get().refreshPredictions();
