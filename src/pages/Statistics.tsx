@@ -1,6 +1,30 @@
-import { useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Area, AreaChart, Legend } from 'recharts';
-import { TrendingUp, Droplets, AlertTriangle, MapPin, Calendar, BarChart3, FileText, RefreshCw } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Area,
+  AreaChart,
+} from 'recharts';
+import {
+  TrendingUp,
+  Droplets,
+  AlertTriangle,
+  MapPin,
+  Calendar,
+  BarChart3,
+  FileText,
+  RefreshCw,
+  Download,
+  ChevronDown,
+  X,
+  Info,
+  Table as TableIcon,
+} from 'lucide-react';
 import {
   useStatistics,
   usePredictions,
@@ -9,48 +33,78 @@ import {
   useWeeklyReports,
   useGenerateWeeklyReport,
   useIsGeneratingReport,
+  useExportRecordsCSV,
 } from '../store/useAppStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import Heatmap from '../components/Heatmap';
 import WeeklyReportCard from '../components/WeeklyReportCard';
 import { getProbabilityBgLight } from '../utils/format';
 import { cn } from '../lib/utils';
+import { downloadCSV, statisticsToCSV } from '../utils/csv';
+import { generateStatistics } from '../utils/analysis';
+import { ExportScope } from '../types';
+import { Button } from '../components/Button';
 
 export default function Statistics() {
   const statistics = useStatistics();
   const predictions = usePredictions();
-  const records = useRecords();
+  const allRecords = useRecords();
   const latestReport = useLatestWeeklyReport();
   const weeklyReports = useWeeklyReports();
   const generateWeeklyReport = useGenerateWeeklyReport();
   const isGeneratingReport = useIsGeneratingReport();
+  const exportRecordsCSV = useExportRecordsCSV();
+
+  const [dateStart, setDateStart] = useState('');
+  const [dateEnd, setDateEnd] = useState('');
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showDateRangePicker, setShowDateRangePicker] = useState(false);
+  const [pendingExportTarget, setPendingExportTarget] = useState<'records' | 'stats' | null>(null);
+
+  const records = useMemo(() => {
+    let result = allRecords;
+    if (dateStart) {
+      result = result.filter((r) => r.date >= dateStart);
+    }
+    if (dateEnd) {
+      result = result.filter((r) => r.date <= dateEnd);
+    }
+    return result;
+  }, [allRecords, dateStart, dateEnd]);
+
+  const filteredStatistics = useMemo(() => {
+    if (!dateStart && !dateEnd) return statistics;
+    return generateStatistics(records);
+  }, [records, dateStart, dateEnd, statistics]);
+
+  const hasActiveFilters = dateStart || dateEnd;
 
   const hourlyChartData = useMemo(() => {
-    if (!statistics) return [];
-    return statistics.recordsByHour.map((item) => ({
+    if (!filteredStatistics) return [];
+    return filteredStatistics.recordsByHour.map((item) => ({
       hour: `${String(item.hour).padStart(2, '0')}`,
       记录数: item.count,
       被溅数: item.splashed,
     }));
-  }, [statistics]);
+  }, [filteredStatistics]);
 
   const monthlyChartData = useMemo(() => {
-    if (!statistics) return [];
-    return statistics.monthlyTrend.map((item) => ({
+    if (!filteredStatistics) return [];
+    return filteredStatistics.monthlyTrend.map((item) => ({
       date: item.date.slice(5),
       记录数: item.count,
     }));
-  }, [statistics]);
+  }, [filteredStatistics]);
 
   const topRoadsData = useMemo(() => {
-    if (!statistics) return [];
-    return statistics.topRoads.slice(0, 5).map((item) => ({
+    if (!filteredStatistics) return [];
+    return filteredStatistics.topRoads.slice(0, 5).map((item) => ({
       road: item.road.length > 4 ? item.road.slice(0, 4) + '...' : item.road,
       fullRoad: item.road,
       记录数: item.count,
       溅水率: Math.round(item.splashRate * 100),
     }));
-  }, [statistics]);
+  }, [filteredStatistics]);
 
   if (!statistics) {
     return (
@@ -63,8 +117,10 @@ export default function Statistics() {
     );
   }
 
-  const splashRatePercent = Math.round(statistics.splashRate * 100);
-  const currentMonthRecords = statistics.monthlyTrend.filter(
+  if (!filteredStatistics) return null;
+
+  const splashRatePercent = Math.round(filteredStatistics.splashRate * 100);
+  const currentMonthRecords = filteredStatistics.monthlyTrend.filter(
     (d) => d.date.startsWith(new Date().toISOString().slice(0, 7))
   );
   const currentMonthCount = currentMonthRecords.reduce((sum, d) => sum + d.count, 0);
@@ -73,12 +129,245 @@ export default function Statistics() {
     generateWeeklyReport();
   };
 
+  const exportStatistics = (scope: ExportScope) => {
+    if (scope === 'dateRange') {
+      setPendingExportTarget('stats');
+      setShowDateRangePicker(true);
+      setShowExportMenu(false);
+      return;
+    }
+
+    let targetStats = filteredStatistics;
+    let suffix = '';
+
+    if (scope === 'all') {
+      targetStats = statistics!;
+      suffix = '-all';
+    } else if (scope === 'filtered') {
+      suffix = hasActiveFilters ? '-filtered' : '-current';
+    }
+
+    const csvContent = statisticsToCSV(
+      {
+        totalRecords: targetStats.totalRecords,
+        totalSplashed: targetStats.totalSplashed,
+        splashRate: targetStats.splashRate,
+      },
+      targetStats.recordsByDay,
+      targetStats.recordsByHour,
+      targetStats.topRoads
+    );
+
+    const filename = `sprinkler-stats-${new Date().toISOString().slice(0, 10)}${suffix}.csv`;
+    downloadCSV(csvContent, filename);
+    setShowExportMenu(false);
+  };
+
+  const exportRecords = (scope: ExportScope) => {
+    if (scope === 'dateRange') {
+      setPendingExportTarget('records');
+      setShowDateRangePicker(true);
+      setShowExportMenu(false);
+      return;
+    }
+
+    let content = '';
+    let suffix = '';
+
+    if (scope === 'all') {
+      content = exportRecordsCSV({ scope: 'all' });
+      suffix = '-all';
+    } else {
+      content = exportRecordsCSV({
+        scope: 'filtered',
+        filteredIds: records.map((r) => r.id),
+      });
+      suffix = hasActiveFilters ? '-filtered' : '-current';
+    }
+
+    const filename = `sprinkler-records-${new Date().toISOString().slice(0, 10)}${suffix}.csv`;
+    downloadCSV(content, filename);
+    setShowExportMenu(false);
+  };
+
+  const confirmDateRangeExport = () => {
+    if (!dateStart || !dateEnd) return;
+
+    const rangeRecords = allRecords.filter(
+      (r) => r.date >= dateStart && r.date <= dateEnd
+    );
+
+    if (pendingExportTarget === 'stats') {
+      const rangeStats = generateStatistics(rangeRecords);
+      const csvContent = statisticsToCSV(
+        {
+          totalRecords: rangeStats.totalRecords,
+          totalSplashed: rangeStats.totalSplashed,
+          splashRate: rangeStats.splashRate,
+        },
+        rangeStats.recordsByDay,
+        rangeStats.recordsByHour,
+        rangeStats.topRoads
+      );
+      const filename = `sprinkler-stats-${dateStart}_to_${dateEnd}.csv`;
+      downloadCSV(csvContent, filename);
+    } else if (pendingExportTarget === 'records') {
+      const content = exportRecordsCSV({
+        scope: 'dateRange',
+        dateRange: { start: dateStart, end: dateEnd },
+      });
+      const filename = `sprinkler-records-${dateStart}_to_${dateEnd}.csv`;
+      downloadCSV(content, filename);
+    }
+
+    setShowDateRangePicker(false);
+    setPendingExportTarget(null);
+  };
+
   return (
     <div className="p-4 space-y-6">
-      <div className="pt-2">
-        <h1 className="text-2xl font-bold text-slate-800 mb-1">统计分析</h1>
-        <p className="text-slate-500 text-sm">洒水车出没规律深度分析</p>
+      <div className="pt-2 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 mb-1">统计分析</h1>
+          <p className="text-slate-500 text-sm">洒水车出没规律深度分析</p>
+        </div>
+        <div className="relative">
+          <button
+            onClick={() => setShowExportMenu(!showExportMenu)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors text-slate-600"
+          >
+            <Download className="w-5 h-5" />
+            <span className="text-sm font-medium">导出</span>
+            <ChevronDown className="w-4 h-4 opacity-60" />
+          </button>
+          {showExportMenu && (
+            <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden z-30 min-w-[240px]">
+              <div className="px-4 py-2 text-xs font-medium text-slate-400 border-b border-slate-50 bg-slate-50/50">
+                导出统计报告
+              </div>
+              <button
+                onClick={() => exportStatistics('all')}
+                className="w-full px-4 py-3 text-left text-sm transition-colors hover:bg-slate-50 text-slate-700 flex items-start gap-3"
+              >
+                <BarChart3 className="w-4 h-4 mt-0.5 text-indigo-500 flex-shrink-0" />
+                <div>
+                  <div className="font-medium">全部数据统计</div>
+                  <div className="text-xs text-slate-400 mt-0.5">
+                    含全部 {allRecords.length} 条记录分析
+                  </div>
+                </div>
+              </button>
+              <button
+                onClick={() => exportStatistics('filtered')}
+                className="w-full px-4 py-3 text-left text-sm transition-colors border-t border-slate-50 hover:bg-slate-50 text-slate-700 flex items-start gap-3"
+              >
+                <BarChart3 className="w-4 h-4 mt-0.5 text-sky-500 flex-shrink-0" />
+                <div>
+                  <div className="font-medium">当前筛选范围统计</div>
+                  <div className="text-xs text-slate-400 mt-0.5">
+                    含 {records.length} 条记录分析
+                    {!hasActiveFilters && ' (即全部)'}
+                  </div>
+                </div>
+              </button>
+              <button
+                onClick={() => exportStatistics('dateRange')}
+                className="w-full px-4 py-3 text-left text-sm transition-colors border-t border-slate-50 hover:bg-slate-50 text-slate-700 flex items-start gap-3"
+              >
+                <Calendar className="w-4 h-4 mt-0.5 text-purple-500 flex-shrink-0" />
+                <div>
+                  <div className="font-medium">指定日期范围统计...</div>
+                  <div className="text-xs text-slate-400 mt-0.5">自定义开始和结束日期</div>
+                </div>
+              </button>
+
+              <div className="px-4 py-2 text-xs font-medium text-slate-400 border-t border-slate-100 bg-slate-50/50">
+                导出记录明细
+              </div>
+              <button
+                onClick={() => exportRecords('all')}
+                className="w-full px-4 py-3 text-left text-sm transition-colors hover:bg-slate-50 text-slate-700 flex items-start gap-3"
+              >
+                <TableIcon className="w-4 h-4 mt-0.5 text-emerald-500 flex-shrink-0" />
+                <div>
+                  <div className="font-medium">全部记录 (CSV)</div>
+                  <div className="text-xs text-slate-400 mt-0.5">共 {allRecords.length} 条</div>
+                </div>
+              </button>
+              <button
+                onClick={() => exportRecords('filtered')}
+                className="w-full px-4 py-3 text-left text-sm transition-colors border-t border-slate-50 hover:bg-slate-50 text-slate-700 flex items-start gap-3"
+              >
+                <TableIcon className="w-4 h-4 mt-0.5 text-teal-500 flex-shrink-0" />
+                <div>
+                  <div className="font-medium">当前范围记录 (CSV)</div>
+                  <div className="text-xs text-slate-400 mt-0.5">
+                    共 {records.length} 条
+                    {!hasActiveFilters && ' (即全部)'}
+                  </div>
+                </div>
+              </button>
+              <button
+                onClick={() => exportRecords('dateRange')}
+                className="w-full px-4 py-3 text-left text-sm transition-colors border-t border-slate-50 hover:bg-slate-50 text-slate-700 flex items-start gap-3"
+              >
+                <Calendar className="w-4 h-4 mt-0.5 text-amber-500 flex-shrink-0" />
+                <div>
+                  <div className="font-medium">指定日期范围记录...</div>
+                  <div className="text-xs text-slate-400 mt-0.5">自定义日期导出记录</div>
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      <Card className="bg-sky-50/50 border-sky-100">
+        <CardContent className="py-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-sm">
+              <Calendar className="w-4 h-4 text-sky-500" />
+              <span className="font-medium text-slate-700">统计范围:</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={dateStart}
+                onChange={(e) => setDateStart(e.target.value)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none text-sm text-slate-700"
+              />
+              <span className="text-slate-400">至</span>
+              <input
+                type="date"
+                value={dateEnd}
+                onChange={(e) => setDateEnd(e.target.value)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none text-sm text-slate-700"
+              />
+            </div>
+            {(dateStart || dateEnd) && (
+              <button
+                onClick={() => {
+                  setDateStart('');
+                  setDateEnd('');
+                }}
+                className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
+              >
+                <X className="w-3 h-3" />
+                重置为全部
+              </button>
+            )}
+            <div className="ml-auto flex items-center gap-2 text-xs text-slate-600">
+              <Info className="w-3.5 h-3.5 text-sky-500" />
+              基于 <span className="font-semibold text-slate-800">{records.length}</span> 条记录分析
+              {hasActiveFilters && (
+                <span className="text-slate-400">
+                  (共 {allRecords.length} 条)
+                </span>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">
@@ -139,7 +428,7 @@ export default function Statistics() {
                 <BarChart3 className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-3xl font-bold text-white">{statistics.totalRecords}</p>
+                <p className="text-3xl font-bold text-white">{filteredStatistics.totalRecords}</p>
                 <p className="text-sm text-sky-100">总记录数</p>
               </div>
             </div>
@@ -153,7 +442,7 @@ export default function Statistics() {
                 <AlertTriangle className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-3xl font-bold text-white">{statistics.totalSplashed}</p>
+                <p className="text-3xl font-bold text-white">{filteredStatistics.totalSplashed}</p>
                 <p className="text-sm text-orange-100">被溅总次数</p>
               </div>
             </div>
@@ -182,7 +471,9 @@ export default function Statistics() {
               </div>
               <div>
                 <p className="text-3xl font-bold text-slate-800">{currentMonthCount}</p>
-                <p className="text-sm text-slate-500">本月记录</p>
+                <p className="text-sm text-slate-500">
+                  {hasActiveFilters ? '范围内当月' : '本月记录'}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -199,7 +490,10 @@ export default function Statistics() {
         <CardContent>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={hourlyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <BarChart
+                data={hourlyChartData}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis
                   dataKey="hour"
@@ -239,7 +533,10 @@ export default function Statistics() {
         <CardContent>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={monthlyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart
+                data={monthlyChartData}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
                 <defs>
                   <linearGradient id="colorRecords" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3} />
@@ -290,7 +587,7 @@ export default function Statistics() {
           <p className="text-sm text-slate-500 mt-1">按星期和小时展示出没频率</p>
         </CardHeader>
         <CardContent>
-          <Heatmap data={statistics.heatmapData} />
+          <Heatmap data={filteredStatistics.heatmapData} />
         </CardContent>
       </Card>
 
@@ -329,7 +626,7 @@ export default function Statistics() {
                   <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-sky-400 to-sky-600 rounded-full transition-all duration-500"
-                      style={{ width: `${(item.记录数 / topRoadsData[0].记录数) * 100}%` }}
+                      style={{ width: `${(item.记录数 / (topRoadsData[0]?.记录数 || 1)) * 100}%` }}
                     />
                   </div>
                   <span
@@ -362,7 +659,12 @@ export default function Statistics() {
                 layout="vertical"
                 margin={{ top: 5, right: 30, left: 60, bottom: 5 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={true} vertical={false} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#e2e8f0"
+                  horizontal={true}
+                  vertical={false}
+                />
                 <XAxis
                   type="number"
                   domain={[0, 100]}
@@ -392,7 +694,12 @@ export default function Statistics() {
                   dataKey="溅水率"
                   fill="#f97316"
                   radius={[0, 6, 6, 0]}
-                  label={{ fill: '#fff', fontSize: 11, position: 'insideRight', formatter: (v: number) => `${v}%` }}
+                  label={{
+                    fill: '#fff',
+                    fontSize: 11,
+                    position: 'insideRight',
+                    formatter: (v: number) => `${v}%`,
+                  }}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -404,6 +711,82 @@ export default function Statistics() {
         <p>数据基于 {records.length} 条记录分析生成</p>
         <p className="mt-1">覆盖 {predictions.length} 个路段</p>
       </div>
+
+      {showDateRangePicker && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-sky-500" />
+                  选择日期范围
+                </CardTitle>
+                <button
+                  onClick={() => {
+                    setShowDateRangePicker(false);
+                    setPendingExportTarget(null);
+                  }}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-700">开始日期</label>
+                <input
+                  type="date"
+                  value={dateStart}
+                  onChange={(e) => setDateStart(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-700">结束日期</label>
+                <input
+                  type="date"
+                  value={dateEnd}
+                  onChange={(e) => setDateEnd(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none"
+                />
+              </div>
+              {dateStart && dateEnd && (
+                <div className="text-sm text-slate-500 bg-sky-50 rounded-lg p-3">
+                  范围内共有{' '}
+                  <span className="font-semibold text-sky-700">
+                    {allRecords.filter((r) => r.date >= dateStart && r.date <= dateEnd).length}
+                  </span>{' '}
+                  条记录
+                </div>
+              )}
+              <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-500">
+                将导出:{' '}
+                <span className="font-medium text-slate-700">
+                  {pendingExportTarget === 'stats' ? '统计分析报告' : '记录明细 CSV'}
+                </span>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowDateRangePicker(false);
+                    setPendingExportTarget(null);
+                  }}
+                >
+                  取消
+                </Button>
+                <Button
+                  onClick={confirmDateRangeExport}
+                  disabled={!dateStart || !dateEnd}
+                >
+                  确认导出
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

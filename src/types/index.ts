@@ -138,6 +138,33 @@ export enum StorageKeys {
   WEEKLY_REPORTS = 'sprinkler_weekly_reports',
 }
 
+export interface ImportReportItem {
+  lineNumber: number;
+  row: Record<string, string>;
+  success: boolean;
+  errors?: string[];
+  record?: SprinklerRecord;
+}
+
+export interface ImportReport {
+  total: number;
+  success: number;
+  failed: number;
+  items: ImportReportItem[];
+  createdRecords?: SprinklerRecord[];
+  startedAt: number;
+  finishedAt: number;
+  error?: string;
+}
+
+export type ExportScope = 'all' | 'filtered' | 'dateRange';
+
+export interface ExportOptions {
+  scope: ExportScope;
+  dateRange?: { start: string; end: string };
+  filteredIds?: string[];
+}
+
 export interface AppState {
   records: SprinklerRecord[];
   predictions: RoadPrediction[];
@@ -157,6 +184,8 @@ export interface AppState {
   refreshStatistics: () => void;
   loadMockData: () => void;
   exportData: () => string;
+  exportRecordsCSV: (options?: ExportOptions) => string;
+  importRecordsFromCSV: (csvContent: string) => ImportReport;
   refreshWeather: () => Promise<WeatherData>;
   getWeatherAdjustment: (probability: number) => WeatherAdjustment;
   generateWeeklyReport: (weekStartDate?: string) => WeeklyReport | null;

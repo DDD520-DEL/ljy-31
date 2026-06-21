@@ -4,10 +4,11 @@ import {
   SprinklerRecord,
   AppSettings,
   StorageKeys,
-  RoadPrediction,
   WeatherData,
   WeeklyReport,
   WeeklyReportSettings,
+  ExportOptions,
+  ImportReport,
 } from '../types';
 import { storage } from '../utils/storage';
 import {
@@ -19,6 +20,7 @@ import {
 import { generateId, formatDate, formatTime } from '../utils/format';
 import { mockRecords } from '../data/mockRecords';
 import { fetchWeatherData, calculateWeatherAdjustment, shouldRefreshWeather } from '../utils/weather';
+import { recordsToCSV, parseCSVToRecords } from '../utils/csv';
 
 const defaultWeeklyReportSettings: WeeklyReportSettings = {
   autoGenerate: true,
@@ -182,6 +184,48 @@ export const useAppStore = create<AppState>((set, get) => ({
     return JSON.stringify(exportData, null, 2);
   },
 
+  exportRecordsCSV: (options?: ExportOptions) => {
+    const { records } = get();
+    let exportRecords = [...records];
+
+    if (options) {
+      if (options.scope === 'filtered' && options.filteredIds) {
+        const idSet = new Set(options.filteredIds);
+        exportRecords = exportRecords.filter((r) => idSet.has(r.id));
+      } else if (options.scope === 'dateRange' && options.dateRange) {
+        const { start, end } = options.dateRange;
+        exportRecords = exportRecords.filter(
+          (r) => r.date >= start && r.date <= end
+        );
+      }
+    }
+
+    exportRecords.sort((a, b) => b.timestamp - a.timestamp);
+    return recordsToCSV(exportRecords);
+  },
+
+  importRecordsFromCSV: (csvContent: string): ImportReport => {
+    const report = parseCSVToRecords(csvContent);
+
+    if (report.createdRecords && report.createdRecords.length > 0) {
+      const existingRecords = get().records;
+      const newRecords = [...report.createdRecords, ...existingRecords];
+      newRecords.sort((a, b) => b.timestamp - a.timestamp);
+      storage.set(StorageKeys.RECORDS, newRecords);
+
+      set((state) => {
+        const updatedRecords = [...report.createdRecords!, ...state.records];
+        updatedRecords.sort((a, b) => b.timestamp - a.timestamp);
+        return { records: updatedRecords };
+      });
+
+      get().refreshPredictions();
+      get().refreshStatistics();
+    }
+
+    return report;
+  },
+
   refreshWeather: async () => {
     set({ isWeatherLoading: true });
     try {
@@ -309,6 +353,8 @@ export const useAddRecord = () => useAppStore((state) => state.addRecord);
 export const useUpdateRecord = () => useAppStore((state) => state.updateRecord);
 export const useDeleteRecord = () => useAppStore((state) => state.deleteRecord);
 export const useExportData = () => useAppStore((state) => state.exportData);
+export const useExportRecordsCSV = () => useAppStore((state) => state.exportRecordsCSV);
+export const useImportRecordsFromCSV = () => useAppStore((state) => state.importRecordsFromCSV);
 export const useLoadMockData = () => useAppStore((state) => state.loadMockData);
 
 export const useCreateRecordFromNow = () => {
