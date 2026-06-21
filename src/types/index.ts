@@ -268,6 +268,75 @@ export interface ExportOptions {
   filteredIds?: string[];
 }
 
+export interface RouteSegment {
+  roadName: string;
+  order: number;
+  distance: number;
+  estimatedTime: number;
+  splashProbability: number;
+  adjustedProbability: number;
+  riskLevel: 'high' | 'medium' | 'low';
+  highRiskTimes: string[];
+  lowRiskTimes: string[];
+}
+
+export interface RouteOption {
+  id: string;
+  name: string;
+  segments: RouteSegment[];
+  totalDistance: number;
+  totalEstimatedTime: number;
+  overallRisk: number;
+  adjustedOverallRisk: number;
+  riskLevel: 'high' | 'medium' | 'low';
+  highRiskSegments: number;
+  mediumRiskSegments: number;
+  lowRiskSegments: number;
+  bestDepartureTime?: string;
+  worstDepartureTime?: string;
+  savedProbability?: number;
+  tag?: '推荐' | '最快' | '最安全' | '备选';
+}
+
+export interface RoutePlanInput {
+  origin: string;
+  destination: string;
+  departureTime?: string;
+  dayOfWeek?: number;
+}
+
+export interface TimeSlotRisk {
+  timeSlot: string;
+  startHour: number;
+  endHour: number;
+  averageRisk: number;
+  highRiskRoads: string[];
+  mediumRiskRoads: string[];
+  lowRiskRoads: string[];
+}
+
+export interface RoadHourlyRisk {
+  roadName: string;
+  hourlyRisk: Record<number, number>;
+  overallRisk: number;
+  peakHours: number[];
+  safeHours: number[];
+}
+
+export interface RouteAvoidanceResult {
+  input: RoutePlanInput;
+  routes: RouteOption[];
+  bestRouteId: string;
+  timeSlotRisks: TimeSlotRisk[];
+  generatedAt: number;
+}
+
+export interface HeatmapRoadData {
+  roadName: string;
+  hourlyData: Array<{ hour: number; risk: number }>;
+  overallRisk: number;
+}
+
 export interface AppState {
   records: SprinklerRecord[];
   predictions: RoadPrediction[];

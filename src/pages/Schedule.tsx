@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
-import { Search, MapPin, Droplets, Clock, Filter, CloudRain, Star, Info } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Search, MapPin, Droplets, Clock, Filter, CloudRain, Star, Info, Route, Shield, ChevronRight } from 'lucide-react';
 import { usePredictions, useWeather, useGetWeatherAdjustment, useRefreshWeather, useIsWeatherLoading, useSettings } from '../store/useAppStore';
 import { useExpandRoad, useClearNavigationParams } from '../store/useSearchStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
@@ -13,6 +13,7 @@ import { cn } from '../lib/utils';
 type SortType = 'recordCount' | 'splashProbability' | 'roadName' | 'favorites';
 
 export default function Schedule() {
+  const navigate = useNavigate();
   const predictions = usePredictions();
   const weather = useWeather();
   const getWeatherAdjustment = useGetWeatherAdjustment();
@@ -359,6 +360,31 @@ export default function Schedule() {
                         <span>24时</span>
                       </div>
                     </div>
+
+                    {getWeatherAdjustment(prediction.splashProbability).adjustedProbability >= 0.4 && (
+                      <div className="pt-2 border-t border-sky-100">
+                        <button
+                          onClick={() => {
+                            const params = new URLSearchParams();
+                            params.set('origin', prediction.roadName);
+                            params.set('destination', '目的地');
+                            navigate(`/route?${params.toString()}`);
+                          }}
+                          className="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 hover:border-emerald-300 transition-all hover:shadow-sm"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                              <Shield className="w-4 h-4 text-emerald-600" />
+                            </div>
+                            <div className="text-left">
+                              <p className="text-sm font-medium text-emerald-800">可规避</p>
+                              <p className="text-xs text-emerald-600">查看该路段风险较高，规划安全出行建议</p>
+                            </div>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-emerald-500" />
+                        </button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}

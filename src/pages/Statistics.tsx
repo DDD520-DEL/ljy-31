@@ -27,6 +27,8 @@ import {
   Table as TableIcon,
   Star,
   Layers,
+  Shield,
+  Route,
 } from 'lucide-react';
 import {
   useStatistics,
@@ -42,12 +44,15 @@ import {
 import { useScrollToSection, useClearNavigationParams } from '../store/useSearchStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import Heatmap from '../components/Heatmap';
+import RoadRiskHeatmap from '../components/RoadRiskHeatmap';
 import WeeklyReportCard from '../components/WeeklyReportCard';
 import { getProbabilityBgLight } from '../utils/format';
 import { cn } from '../lib/utils';
 import { downloadCSV, statisticsToCSV } from '../utils/csv';
 import { generateStatistics } from '../utils/analysis';
+import { generateHeatmapRoadData } from '../utils/routePlanner';
 import { ExportScope } from '../types';
+import { useGetWeatherAdjustment } from '../store/useAppStore';
 import { Button } from '../components/Button';
 
 type StatsScope = 'all' | 'favorites';
@@ -62,6 +67,7 @@ export default function Statistics() {
   const isGeneratingReport = useIsGeneratingReport();
   const exportRecordsCSV = useExportRecordsCSV();
   const settings = useSettings();
+  const getWeatherAdjustment = useGetWeatherAdjustment();
   const scrollToSection = useScrollToSection();
   const clearNavigationParams = useClearNavigationParams();
   const location = useLocation();
@@ -842,6 +848,27 @@ export default function Statistics() {
         </CardHeader>
         <CardContent>
           <Heatmap data={filteredStatistics.heatmapData} />
+        </CardContent>
+      </Card>
+
+      <Card
+        ref={(el) => (sectionRefs.current['roadRisk'] = el)}
+      >
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-sky-500" />
+            时段路段风险热力图
+          </CardTitle>
+          <p className="text-sm text-slate-500 mt-1">各路段不同时段的溅水风险分布</p>
+        </CardHeader>
+        <CardContent>
+          <RoadRiskHeatmap
+            data={generateHeatmapRoadData(
+              predictions,
+              8,
+              (prob) => getWeatherAdjustment(prob).adjustedProbability
+            )}
+          />
         </CardContent>
       </Card>
 
