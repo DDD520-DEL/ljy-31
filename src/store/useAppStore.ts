@@ -155,3 +155,25 @@ export const useCreateRecordFromNow = () => {
     });
   };
 };
+
+export const useToggleFavoriteRoad = () => {
+  const updateSettings = useAppStore((state) => state.updateSettings);
+  const favoriteRoads = useAppStore((state) => state.settings.favoriteRoads);
+  return (roadName: string) => {
+    const newFavorites = favoriteRoads.includes(roadName)
+      ? favoriteRoads.filter((r) => r !== roadName)
+      : [...favoriteRoads, roadName];
+    updateSettings({ favoriteRoads: newFavorites });
+  };
+};
+
+export const useIsFavoriteRoad = (roadName: string) => {
+  const favoriteRoads = useAppStore((state) => state.settings.favoriteRoads);
+  return favoriteRoads.includes(roadName);
+};
+
+export const useFavoritePredictions = () => {
+  const predictions = usePredictions();
+  const favoriteRoads = useAppStore((state) => state.settings.favoriteRoads);
+  return predictions.filter((p) => favoriteRoads.includes(p.roadName));
+};

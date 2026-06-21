@@ -1,22 +1,42 @@
+import { useState } from 'react';
 import { getProbabilityColor, getProbabilityBgLight, getConfidenceLabel, getConfidenceColor } from '../utils/format';
 import { RoadPrediction } from '../types';
-import { Droplets, MapPin, TrendingUp } from 'lucide-react';
+import { useIsFavoriteRoad, useToggleFavoriteRoad } from '../store/useAppStore';
+import { Droplets, MapPin, TrendingUp, Star } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 interface PredictionCardProps {
   prediction: RoadPrediction;
   onClick?: () => void;
   highlight?: boolean;
+  showFavorite?: boolean;
 }
 
-export default function PredictionCard({ prediction, onClick, highlight = false }: PredictionCardProps) {
+export default function PredictionCard({
+  prediction,
+  onClick,
+  highlight = false,
+  showFavorite = true,
+}: PredictionCardProps) {
   const splashPercent = Math.round(prediction.splashProbability * 100);
+  const isFavorite = useIsFavoriteRoad(prediction.roadName);
+  const toggleFavorite = useToggleFavoriteRoad();
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const handleFavoriteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsAnimating(true);
+    toggleFavorite(prediction.roadName);
+    setTimeout(() => setIsAnimating(false), 300);
+  };
 
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-2xl p-5 shadow-sm border border-slate-100 cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 ${
-        highlight ? 'ring-2 ring-sky-500 ring-offset-2' : ''
-      }`}
+      className={cn(
+        'bg-white rounded-2xl p-5 shadow-sm border border-slate-100 cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 relative',
+        highlight && 'ring-2 ring-sky-500 ring-offset-2'
+      )}
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -28,14 +48,39 @@ export default function PredictionCard({ prediction, onClick, highlight = false 
             <p className="text-sm text-slate-500">{prediction.recordCount} 条记录</p>
           </div>
         </div>
-        <div className="text-right">
-          <div className="flex items-center gap-1 text-sm">
-            <Droplets className={`w-4 h-4 ${splashPercent >= 40 ? 'text-orange-500' : 'text-slate-400'}`} />
-            <span className={`font-medium ${splashPercent >= 40 ? 'text-orange-600' : 'text-slate-600'}`}>
-              {splashPercent}%
-            </span>
+        <div className="flex items-center gap-2">
+          {showFavorite && (
+            <button
+              onClick={handleFavoriteClick}
+              className={cn(
+                'w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200',
+                isFavorite
+                  ? 'bg-amber-100 hover:bg-amber-200'
+                  : 'bg-slate-100 hover:bg-slate-200',
+                isAnimating && 'scale-125'
+              )}
+            >
+              <Star
+                className={cn(
+                  'w-4 h-4 transition-colors',
+                  isFavorite ? 'text-amber-500 fill-amber-500' : 'text-slate-400'
+                )}
+              />
+            </button>
+          )}
+          <div className="text-right">
+            <div className="flex items-center gap-1 text-sm">
+              <Droplets
+                className={`w-4 h-4 ${splashPercent >= 40 ? 'text-orange-500' : 'text-slate-400'}`}
+              />
+              <span
+                className={`font-medium ${splashPercent >= 40 ? 'text-orange-600' : 'text-slate-600'}`}
+              >
+                {splashPercent}%
+              </span>
+            </div>
+            <p className="text-xs text-slate-400">溅水概率</p>
           </div>
-          <p className="text-xs text-slate-400">溅水概率</p>
         </div>
       </div>
 

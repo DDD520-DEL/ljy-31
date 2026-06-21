@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { Droplets, Plus, Bell, AlertTriangle, ChevronRight } from 'lucide-react';
+import { Droplets, Plus, Bell, AlertTriangle, ChevronRight, Star, Settings as SettingsIcon } from 'lucide-react';
 import { useTodayPredictions, useSplashStatistics, useRecentRecords, useUpcomingReminders } from '../hooks/usePredictions';
-import { useSettings } from '../store/useAppStore';
+import { useSettings, useFavoritePredictions } from '../store/useAppStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import { Button } from '../components/Button';
 import PredictionCard from '../components/PredictionCard';
@@ -15,6 +15,7 @@ export default function Dashboard() {
   const splashStats = useSplashStatistics();
   const recentRecords = useRecentRecords(3);
   const settings = useSettings();
+  const favoritePredictions = useFavoritePredictions();
   const upcomingReminders = useUpcomingReminders(settings.reminderMinutes);
 
   const currentHour = new Date().getHours();
@@ -43,15 +44,23 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-slate-800">{greeting()} ☀️</h1>
           <p className="text-slate-500 text-sm mt-1">今天也要小心洒水车哦</p>
         </div>
-        <button
-          onClick={() => navigate('/record')}
-          className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
-        >
-          <Plus className="w-6 h-6" strokeWidth={2.5} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/settings')}
+            className="w-12 h-12 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            <SettingsIcon className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => navigate('/record')}
+            className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+          >
+            <Plus className="w-6 h-6" strokeWidth={2.5} />
+          </button>
+        </div>
       </div>
 
-      {upcomingReminders.length > 0 && (
+      {settings.reminderEnabled && upcomingReminders.length > 0 && (
         <Card gradient className="overflow-hidden">
           <CardHeader className="border-b border-white/20">
             <div className="flex items-center gap-2">
@@ -125,6 +134,34 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
+      {favoritePredictions.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+            <h2 className="text-lg font-semibold text-slate-800">常用路段预测</h2>
+          </div>
+            <button
+              onClick={() => navigate('/schedule')}
+              className="text-sky-600 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all"
+            >
+              管理
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="space-y-3">
+            {favoritePredictions.slice(0, 3).map((prediction) => (
+              <PredictionCard
+                key={prediction.roadName}
+                prediction={prediction}
+                highlight={true}
+                onClick={() => navigate('/schedule')}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {todayPredictions.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -189,7 +226,7 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {upcomingReminders.length > 0 && (
+      {settings.reminderEnabled && upcomingReminders.length > 0 && (
         <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
