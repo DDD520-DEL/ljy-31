@@ -1,0 +1,222 @@
+import { useNavigate } from 'react-router-dom';
+import { Droplets, Plus, Bell, AlertTriangle, ChevronRight } from 'lucide-react';
+import { useTodayPredictions, useSplashStatistics, useRecentRecords, useUpcomingReminders } from '../hooks/usePredictions';
+import { useSettings } from '../store/useAppStore';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
+import { Button } from '../components/Button';
+import PredictionCard from '../components/PredictionCard';
+import RecordCard from '../components/RecordCard';
+import TimeAxis from '../components/TimeAxis';
+import { getConfidenceLabel, getConfidenceColor } from '../utils/format';
+
+export default function Dashboard() {
+  const navigate = useNavigate();
+  const todayPredictions = useTodayPredictions();
+  const splashStats = useSplashStatistics();
+  const recentRecords = useRecentRecords(3);
+  const settings = useSettings();
+  const upcomingReminders = useUpcomingReminders(settings.reminderMinutes);
+
+  const currentHour = new Date().getHours();
+  const timeAxisData = Array.from({ length: 24 }, (_, i) => ({
+    hour: i,
+    count: todayPredictions.reduce((sum, p) => {
+      return sum + p.predictedTimes.filter((t) => t.hour === i).length;
+    }, 0),
+  }));
+
+  const greeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 6) return '夜深了';
+    if (hour < 9) return '早上好';
+    if (hour < 12) return '上午好';
+    if (hour < 14) return '中午好';
+    if (hour < 18) return '下午好';
+    if (hour < 22) return '晚上好';
+    return '夜深了';
+  };
+
+  return (
+    <div className="p-4 space-y-6">
+      <div className="flex items-center justify-between pt-2">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">{greeting()} ☀️</h1>
+          <p className="text-slate-500 text-sm mt-1">今天也要小心洒水车哦</p>
+        </div>
+        <button
+          onClick={() => navigate('/record')}
+          className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+        >
+          <Plus className="w-6 h-6" strokeWidth={2.5} />
+        </button>
+      </div>
+
+      {upcomingReminders.length > 0 && (
+        <Card gradient className="overflow-hidden">
+          <CardHeader className="border-b border-white/20">
+            <div className="flex items-center gap-2">
+              <Bell className="w-5 h-5 animate-pulse" />
+              <CardTitle className="text-white">即将提醒</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {upcomingReminders.slice(0, 2).map((reminder, idx) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between bg-white/10 rounded-xl p-3 backdrop-blur-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-yellow-300" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">{reminder.road}</p>
+                    <p className="text-sm text-sky-100">预计 {reminder.time} 经过</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold text-white">{reminder.minutesLeft}</p>
+                  <p className="text-xs text-sky-100">分钟后</p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-3 gap-3">
+        <Card hover className="text-center">
+          <CardContent className="py-5">
+            <div className="w-12 h-12 mx-auto rounded-xl bg-sky-100 flex items-center justify-center mb-2">
+              <Droplets className="w-6 h-6 text-sky-600" />
+            </div>
+            <p className="text-2xl font-bold text-slate-800">{splashStats.total}</p>
+            <p className="text-xs text-slate-500 mt-1">总记录</p>
+          </CardContent>
+        </Card>
+        <Card hover className="text-center">
+          <CardContent className="py-5">
+            <div className="w-12 h-12 mx-auto rounded-xl bg-orange-100 flex items-center justify-center mb-2">
+              <AlertTriangle className="w-6 h-6 text-orange-500" />
+            </div>
+            <p className="text-2xl font-bold text-slate-800">{splashStats.splashed}</p>
+            <p className="text-xs text-slate-500 mt-1">被溅次数</p>
+          </CardContent>
+        </Card>
+        <Card hover className="text-center">
+          <CardContent className="py-5">
+            <div className="w-12 h-12 mx-auto rounded-xl bg-emerald-100 flex items-center justify-center mb-2">
+              <Droplets className="w-6 h-6 text-emerald-600" />
+            </div>
+            <p className="text-2xl font-bold text-slate-800">
+              {Math.round(splashStats.rate * 100)}%
+            </p>
+            <p className="text-xs text-slate-500 mt-1">溅水率</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>今日 24 小时分布</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <TimeAxis data={timeAxisData} />
+        </CardContent>
+      </Card>
+
+      {todayPredictions.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-slate-800">今日预测路段</h2>
+            <button
+              onClick={() => navigate('/schedule')}
+              className="text-sky-600 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all"
+            >
+              查看全部
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="space-y-3">
+            {todayPredictions.slice(0, 3).map((prediction) => (
+              <PredictionCard
+                key={prediction.roadName}
+                prediction={prediction}
+                onClick={() => navigate('/schedule')}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {recentRecords.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-slate-800">最近记录</h2>
+            <button
+              onClick={() => navigate('/history')}
+              className="text-sky-600 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all"
+            >
+              查看全部
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="space-y-3">
+            {recentRecords.slice(0, 3).map((record) => (
+              <RecordCard
+                key={record.id}
+                record={record}
+                showActions={false}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {todayPredictions.length === 0 && recentRecords.length === 0 && (
+        <Card>
+          <CardContent className="text-center py-12">
+            <div className="w-20 h-20 mx-auto rounded-full bg-sky-100 flex items-center justify-center mb-4">
+              <Droplets className="w-10 h-10 text-sky-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-800 mb-2">还没有记录</h3>
+            <p className="text-slate-500 text-sm mb-6">开始记录洒水车出没，积累数据后就能生成预测啦</p>
+            <Button onClick={() => navigate('/record')} size="lg">
+              <Plus className="w-5 h-5" />
+              记录第一次
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {upcomingReminders.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <Bell className="w-5 h-5 text-amber-600" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-amber-800 mb-1">出行提醒</p>
+              <p className="text-sm text-amber-700">
+                未来 {settings.reminderMinutes * 2} 分钟内有 {upcomingReminders.length} 个路段可能遇到洒水车，注意避开！
+              </p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {upcomingReminders.slice(0, 3).map((r, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white text-xs font-medium text-amber-700"
+                  >
+                    {r.road} {r.time}
+                    <span className={`${getConfidenceColor(r.confidence)}`}>
+                      ({getConfidenceLabel(r.confidence)})
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
