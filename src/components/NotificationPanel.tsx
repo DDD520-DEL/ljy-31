@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   X,
@@ -55,6 +56,7 @@ const formatNotificationTime = (timestamp: number): string => {
 };
 
 export function NotificationPanel() {
+  const navigate = useNavigate();
   const notifications = useNotifications();
   const unreadCount = useUnreadCount();
   const markAsRead = useMarkAsRead();
@@ -66,7 +68,7 @@ export function NotificationPanel() {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
+      if (panelRef.current && panelRef.current.contains(event.target as Node)) {
         return;
       }
       setShowPanel(false);
@@ -83,6 +85,11 @@ export function NotificationPanel() {
 
   const handleNotificationClick = (id: string) => {
     markAsRead(id);
+  };
+
+  const handleOpenSettings = () => {
+    setShowPanel(false);
+    navigate('/settings');
   };
 
   return (
@@ -127,7 +134,8 @@ export function NotificationPanel() {
               全部已读
             </button>
             <button
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
+              onClick={handleOpenSettings}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-slate-600 hover:bg-slate-200 transition-colors"
             >
               <Settings className="w-4 h-4" />
               通知设置
