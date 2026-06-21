@@ -62,12 +62,72 @@ export interface WeatherAdjustment {
   reason: string;
 }
 
+export interface RoadWeeklyStats {
+  road: string;
+  recordCount: number;
+  splashCount: number;
+  splashRate: number;
+  prevRecordCount: number;
+  prevSplashCount: number;
+  prevSplashRate: number;
+  changeRate: number;
+  trend: 'up' | 'down' | 'stable';
+}
+
+export interface HighRiskPeriod {
+  dayOfWeek: number;
+  dayName: string;
+  hour: number;
+  hourRange: string;
+  riskLevel: 'high' | 'medium' | 'low';
+  recordCount: number;
+  splashRate: number;
+}
+
+export interface WeeklyReport {
+  id: string;
+  weekStart: string;
+  weekEnd: string;
+  weekNumber: number;
+  generatedAt: number;
+  totalRecords: number;
+  totalSplashed: number;
+  overallSplashRate: number;
+  prevTotalRecords: number;
+  prevTotalSplashed: number;
+  prevOverallSplashRate: number;
+  overallChange: number;
+  overallTrend: 'up' | 'down' | 'stable';
+  roadStats: RoadWeeklyStats[];
+  highRiskPeriods: HighRiskPeriod[];
+  topSplashRoads: RoadWeeklyStats[];
+  mostImprovedRoads: RoadWeeklyStats[];
+  dailySummary: Array<{
+    date: string;
+    dayName: string;
+    recordCount: number;
+    splashCount: number;
+    splashRate: number;
+  }>;
+}
+
+export interface WeeklyReportSettings {
+  autoGenerate: boolean;
+  pushDay: number;
+  pushHour: number;
+  pushMinute: number;
+  lastGeneratedId: string | null;
+  lastGeneratedAt: number | null;
+  bannerDismissed: Record<string, boolean>;
+}
+
 export interface AppSettings {
   theme: 'light' | 'dark';
   reminderEnabled: boolean;
   reminderMinutes: number;
   favoriteRoads: string[];
   weatherNotificationEnabled: boolean;
+  weeklyReport: WeeklyReportSettings;
 }
 
 export enum StorageKeys {
@@ -75,6 +135,7 @@ export enum StorageKeys {
   PREDICTIONS = 'sprinkler_predictions',
   SETTINGS = 'sprinkler_settings',
   WEATHER = 'sprinkler_weather',
+  WEEKLY_REPORTS = 'sprinkler_weekly_reports',
 }
 
 export interface AppState {
@@ -83,8 +144,11 @@ export interface AppState {
   statistics: StatisticsData | null;
   settings: AppSettings;
   weather: WeatherData | null;
+  weeklyReports: WeeklyReport[];
+  latestWeeklyReport: WeeklyReport | null;
   isLoading: boolean;
   isWeatherLoading: boolean;
+  isGeneratingReport: boolean;
   addRecord: (record: Omit<SprinklerRecord, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateRecord: (id: string, record: Partial<SprinklerRecord>) => void;
   deleteRecord: (id: string) => void;
@@ -95,4 +159,8 @@ export interface AppState {
   exportData: () => string;
   refreshWeather: () => Promise<WeatherData>;
   getWeatherAdjustment: (probability: number) => WeatherAdjustment;
+  generateWeeklyReport: (weekStartDate?: string) => WeeklyReport | null;
+  getWeeklyReportByWeek: (weekStart: string) => WeeklyReport | undefined;
+  dismissWeeklyBanner: (reportId: string) => void;
+  checkAndGenerateWeeklyReport: () => WeeklyReport | null;
 }

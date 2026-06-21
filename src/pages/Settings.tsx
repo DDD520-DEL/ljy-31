@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   Info,
   CloudRain,
+  FileText,
+  Calendar,
 } from 'lucide-react';
 import {
   useSettings,
@@ -20,6 +22,10 @@ import {
   useLoadMockData,
   useExportData,
   useRecords,
+  useWeeklyReports,
+  useLatestWeeklyReport,
+  useGenerateWeeklyReport,
+  useIsGeneratingReport,
 } from '../store/useAppStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import { Button } from '../components/Button';
@@ -33,6 +39,21 @@ const reminderOptions = [
   { value: 60, label: '1 小时' },
 ];
 
+const weekDayOptions = [
+  { value: 1, label: '周一' },
+  { value: 2, label: '周二' },
+  { value: 3, label: '周三' },
+  { value: 4, label: '周四' },
+  { value: 5, label: '周五' },
+  { value: 6, label: '周六' },
+  { value: 7, label: '周日' },
+];
+
+const pushHourOptions = Array.from({ length: 24 }, (_, i) => ({
+  value: i,
+  label: `${String(i).padStart(2, '0')}:00`,
+}));
+
 export default function SettingsPage() {
   const navigate = useNavigate();
   const settings = useSettings();
@@ -40,6 +61,10 @@ export default function SettingsPage() {
   const loadMockData = useLoadMockData();
   const exportData = useExportData();
   const records = useRecords();
+  const weeklyReports = useWeeklyReports();
+  const latestReport = useLatestWeeklyReport();
+  const generateWeeklyReport = useGenerateWeeklyReport();
+  const isGeneratingReport = useIsGeneratingReport();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const handleReminderToggle = () => {
@@ -52,6 +77,37 @@ export default function SettingsPage() {
 
   const handleWeatherNotificationToggle = () => {
     updateSettings({ weatherNotificationEnabled: !settings.weatherNotificationEnabled });
+  };
+
+  const handleWeeklyAutoGenerateToggle = () => {
+    updateSettings({
+      weeklyReport: {
+        ...settings.weeklyReport,
+        autoGenerate: !settings.weeklyReport.autoGenerate,
+      },
+    });
+  };
+
+  const handlePushDayChange = (day: number) => {
+    updateSettings({
+      weeklyReport: {
+        ...settings.weeklyReport,
+        pushDay: day,
+      },
+    });
+  };
+
+  const handlePushHourChange = (hour: number) => {
+    updateSettings({
+      weeklyReport: {
+        ...settings.weeklyReport,
+        pushHour: hour,
+      },
+    });
+  };
+
+  const handleGenerateNow = () => {
+    generateWeeklyReport();
   };
 
   const handleExport = () => {
@@ -192,6 +248,141 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-indigo-500" />
+            周报设置
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="font-medium text-slate-800">自动生成周报</p>
+              <p className="text-sm text-slate-500 mt-0.5">
+                每周按设定时间自动生成洒水车出没周报
+              </p>
+            </div>
+            <button
+              onClick={handleWeeklyAutoGenerateToggle}
+              className={toggleSwitchClass(settings.weeklyReport.autoGenerate)}
+              aria-pressed={settings.weeklyReport.autoGenerate}
+            >
+              <span
+                aria-hidden="true"
+                className={toggleDotClass(settings.weeklyReport.autoGenerate)}
+              />
+            </button>
+          </div>
+
+          <div className={cn(!settings.weeklyReport.autoGenerate && 'opacity-50 pointer-events-none')}>
+            <div className="flex items-center gap-2 mb-3">
+              <Calendar className="w-4 h-4 text-slate-500" />
+              <p className="font-medium text-slate-700">推送时间</p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-slate-500 mb-2">每周</p>
+                <div className="grid grid-cols-7 gap-1.5">
+                  {weekDayOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handlePushDayChange(option.value)}
+                      className={cn(
+                        'py-2 rounded-lg text-xs font-medium transition-all',
+                        settings.weeklyReport.pushDay === option.value
+                          ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-500 mb-2">时间点</p>
+                <div className="grid grid-cols-6 gap-1.5 max-h-32 overflow-y-auto pr-1">
+                  {pushHourOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handlePushHourChange(option.value)}
+                      className={cn(
+                        'py-1.5 rounded-lg text-xs font-medium transition-all',
+                        settings.weeklyReport.pushHour === option.value
+                          ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-400 mt-2">
+              将在每周
+              <span className="text-indigo-600 font-medium mx-1">
+                {weekDayOptions.find((d) => d.value === settings.weeklyReport.pushDay)?.label}
+              </span>
+              <span className="text-indigo-600 font-medium mx-1">
+                {pushHourOptions.find((h) => h.value === settings.weeklyReport.pushHour)?.label}
+              </span>
+              自动生成周报并推送
+            </p>
+          </div>
+
+          <div className="pt-4 border-t border-slate-100">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="font-medium text-slate-800">周报管理</p>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  已生成 {weeklyReports.length} 份周报
+                  {latestReport && (
+                    <span className="block text-xs text-slate-400 mt-0.5">
+                      最新：{latestReport.weekStart} ~ {latestReport.weekEnd}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <Button
+                onClick={handleGenerateNow}
+                disabled={isGeneratingReport || records.length === 0}
+                size="sm"
+              >
+                <RefreshCw className={cn('w-4 h-4', isGeneratingReport && 'animate-spin')} />
+                {isGeneratingReport
+                  ? '生成中...'
+                  : weeklyReports.length > 0
+                  ? '立即更新'
+                  : '立即生成'}
+              </Button>
+            </div>
+
+            {weeklyReports.length > 0 && (
+              <button
+                onClick={() => navigate('/statistics')}
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium text-indigo-800">查看周报详情</p>
+                    <p className="text-xs text-indigo-500">前往统计页查看完整周报分析</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-indigo-400" />
+              </button>
+            )}
           </div>
         </CardContent>
       </Card>

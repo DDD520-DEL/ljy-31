@@ -6,12 +6,29 @@ import {
   StorageKeys,
   RoadPrediction,
   WeatherData,
+  WeeklyReport,
+  WeeklyReportSettings,
 } from '../types';
 import { storage } from '../utils/storage';
-import { generateAllPredictions, generateStatistics } from '../utils/analysis';
+import {
+  generateAllPredictions,
+  generateStatistics,
+  generateWeeklyReport as generateWeeklyReportFn,
+  shouldGenerateWeeklyReport,
+} from '../utils/analysis';
 import { generateId, formatDate, formatTime } from '../utils/format';
 import { mockRecords } from '../data/mockRecords';
 import { fetchWeatherData, calculateWeatherAdjustment, shouldRefreshWeather } from '../utils/weather';
+
+const defaultWeeklyReportSettings: WeeklyReportSettings = {
+  autoGenerate: true,
+  pushDay: 1,
+  pushHour: 8,
+  pushMinute: 0,
+  lastGeneratedId: null,
+  lastGeneratedAt: null,
+  bannerDismissed: {},
+};
 
 const defaultSettings: AppSettings = {
   theme: 'light',
@@ -19,6 +36,7 @@ const defaultSettings: AppSettings = {
   reminderMinutes: 15,
   favoriteRoads: [],
   weatherNotificationEnabled: true,
+  weeklyReport: defaultWeeklyReportSettings,
 };
 
 const getInitialRecords = (): SprinklerRecord[] => {
@@ -35,11 +53,32 @@ const getInitialWeather = (): WeatherData | null => {
   return null;
 };
 
+const getInitialSettings = (): AppSettings => {
+  const stored = storage.get<AppSettings>(StorageKeys.SETTINGS, defaultSettings);
+  return {
+    ...defaultSettings,
+    ...stored,
+    weeklyReport: {
+      ...defaultWeeklyReportSettings,
+      ...(stored.weeklyReport || {}),
+    },
+  };
+};
+
+const getInitialWeeklyReports = (): WeeklyReport[] => {
+  return storage.get<WeeklyReport[]>(StorageKeys.WEEKLY_REPORTS, []);
+};
+
 const initialRecords = getInitialRecords();
 const initialPredictions = generateAllPredictions(initialRecords);
 const initialStatistics = generateStatistics(initialRecords);
-const initialSettings = storage.get<AppSettings>(StorageKeys.SETTINGS, defaultSettings);
+const initialSettings = getInitialSettings();
 const initialWeather = getInitialWeather();
+const initialWeeklyReports = getInitialWeeklyReports();
+const initialLatestWeeklyReport =
+  initialWeeklyReports.length > 0
+    ? initialWeeklyReports.sort((a, b) => b.generatedAt - a.generatedAt)[0]
+    : null;
 
 export const useAppStore = create<AppState>((set, get) => ({
   records: initialRecords,
@@ -47,8 +86,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   statistics: initialStatistics,
   settings: initialSettings,
   weather: initialWeather,
+  weeklyReports: initialWeeklyReports,
+  latestWeeklyReport: initialLatestWeeklyReport,
   isLoading: false,
   isWeatherLoading: false,
+  isGeneratingReport: false,
 
   addRecord: (recordData) => {
     const now = Date.now();
@@ -165,6 +207,98 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     return calculateWeatherAdjustment(probability, weather.type);
   },
+
+  generateWeeklyReport: (weekStartDate?: string) => {
+    set({ isGeneratingReport: true });
+    try {
+      const { records, weeklyReports, settings } = get();
+      const report = generateWeeklyReportFn(records, weekStartDate);
+
+      if (!report) {
+        set({ isGeneratingReport: false });
+        return null;
+      }
+
+      const existingIndex = weeklyReports.findIndex(
+        (r) => r.weekStart === report.weekStart
+      );
+
+      let newReports: WeeklyReport[];
+      if (existingIndex >= 0) {
+        newReports = [...weeklyReports];
+        newReports[existingIndex] = report;
+      } else {
+        newReports = [...weeklyReports, report];
+      }
+
+      newReports.sort((a, b) => b.generatedAt - a.generatedAt);
+
+      const newSettings = {
+        ...settings,
+        weeklyReport: {
+          ...settings.weeklyReport,
+          lastGeneratedId: report.id,
+          lastGeneratedAt: report.generatedAt,
+        },
+      };
+
+      storage.set(StorageKeys.WEEKLY_REPORTS, newReports);
+      storage.set(StorageKeys.SETTINGS, newSettings);
+
+      set({
+        weeklyReports: newReports,
+        latestWeeklyReport: report,
+        settings: newSettings,
+        isGeneratingReport: false,
+      });
+
+      return report;
+    } catch (error) {
+      console.error('Failed to generate weekly report:', error);
+      set({ isGeneratingReport: false });
+      return null;
+    }
+  },
+
+  getWeeklyReportByWeek: (weekStart: string) => {
+    const { weeklyReports } = get();
+    return weeklyReports.find((r) => r.weekStart === weekStart);
+  },
+
+  dismissWeeklyBanner: (reportId: string) => {
+    const { settings } = get();
+    const newSettings = {
+      ...settings,
+      weeklyReport: {
+        ...settings.weeklyReport,
+        bannerDismissed: {
+          ...settings.weeklyReport.bannerDismissed,
+          [reportId]: true,
+        },
+      },
+    };
+    storage.set(StorageKeys.SETTINGS, newSettings);
+    set({ settings: newSettings });
+  },
+
+  checkAndGenerateWeeklyReport: () => {
+    const { settings } = get();
+    const { autoGenerate, lastGeneratedAt, pushDay, pushHour, pushMinute } =
+      settings.weeklyReport;
+
+    if (
+      shouldGenerateWeeklyReport(
+        autoGenerate,
+        lastGeneratedAt,
+        pushDay,
+        pushHour,
+        pushMinute
+      )
+    ) {
+      return get().generateWeeklyReport();
+    }
+    return null;
+  },
 }));
 
 export const useRecords = () => useAppStore((state) => state.records);
@@ -222,3 +356,12 @@ export const useWeather = () => useAppStore((state) => state.weather);
 export const useIsWeatherLoading = () => useAppStore((state) => state.isWeatherLoading);
 export const useRefreshWeather = () => useAppStore((state) => state.refreshWeather);
 export const useGetWeatherAdjustment = () => useAppStore((state) => state.getWeatherAdjustment);
+
+export const useWeeklyReports = () => useAppStore((state) => state.weeklyReports);
+export const useLatestWeeklyReport = () => useAppStore((state) => state.latestWeeklyReport);
+export const useIsGeneratingReport = () => useAppStore((state) => state.isGeneratingReport);
+export const useGenerateWeeklyReport = () => useAppStore((state) => state.generateWeeklyReport);
+export const useGetWeeklyReportByWeek = () => useAppStore((state) => state.getWeeklyReportByWeek);
+export const useDismissWeeklyBanner = () => useAppStore((state) => state.dismissWeeklyBanner);
+export const useCheckAndGenerateWeeklyReport = () => useAppStore((state) => state.checkAndGenerateWeeklyReport);
+export const useWeeklyReportSettings = () => useAppStore((state) => state.settings.weeklyReport);

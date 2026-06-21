@@ -1,13 +1,22 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Droplets, Plus, Bell, AlertTriangle, ChevronRight, Star, Settings as SettingsIcon, CloudRain, Wind, Droplets as DropletsIcon, RefreshCw } from 'lucide-react';
+import { Droplets, Plus, Bell, AlertTriangle, ChevronRight, Star, Settings as SettingsIcon, CloudRain, Wind, Droplets as DropletsIcon, RefreshCw, FileText, X, TrendingUp, TrendingDown, Minus, Zap } from 'lucide-react';
 import { useTodayPredictions, useSplashStatistics, useRecentRecords, useUpcomingReminders } from '../hooks/usePredictions';
-import { useSettings, useFavoritePredictions } from '../store/useAppStore';
+import {
+  useSettings,
+  useFavoritePredictions,
+  useLatestWeeklyReport,
+  useCheckAndGenerateWeeklyReport,
+  useDismissWeeklyBanner,
+  useWeeklyReportSettings,
+} from '../store/useAppStore';
 import { useWeatherData, useWeatherHint, useOverallWeatherRisk } from '../hooks/useWeather';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import { Button } from '../components/Button';
 import PredictionCard from '../components/PredictionCard';
 import RecordCard from '../components/RecordCard';
 import TimeAxis from '../components/TimeAxis';
+import WeeklyReportCard from '../components/WeeklyReportCard';
 import { getConfidenceLabel, getConfidenceColor } from '../utils/format';
 import { cn } from '../lib/utils';
 
@@ -22,6 +31,28 @@ export default function Dashboard() {
   const { weather, isWeatherLoading, refreshWeather } = useWeatherData();
   const weatherHint = useWeatherHint();
   const weatherRisk = useOverallWeatherRisk();
+  const latestReport = useLatestWeeklyReport();
+  const checkAndGenerateWeeklyReport = useCheckAndGenerateWeeklyReport();
+  const dismissWeeklyBanner = useDismissWeeklyBanner();
+  const weeklyReportSettings = useWeeklyReportSettings();
+  const [showReportDetail, setShowReportDetail] = useState(false);
+
+  useEffect(() => {
+    checkAndGenerateWeeklyReport();
+  }, [checkAndGenerateWeeklyReport]);
+
+  const shouldShowBanner =
+    latestReport && !weeklyReportSettings.bannerDismissed[latestReport.id];
+
+  const handleDismissBanner = () => {
+    if (latestReport) {
+      dismissWeeklyBanner(latestReport.id);
+    }
+  };
+
+  const handleViewReportDetail = () => {
+    navigate('/statistics');
+  };
 
   const currentHour = new Date().getHours();
   const timeAxisData = Array.from({ length: 24 }, (_, i) => ({
@@ -64,6 +95,53 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {shouldShowBanner && latestReport && (
+        <div className="relative">
+          <Card className="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white border-0 overflow-hidden shadow-lg">
+            <button
+              onClick={handleDismissBanner}
+              className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <CardContent className="py-4">
+              {!showReportDetail ? (
+                <WeeklyReportCard
+                  report={latestReport}
+                  compact
+                  onViewDetail={() => setShowReportDetail(true)}
+                />
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-white/80" />
+                      <span className="text-sm text-white/80">
+                        第 {latestReport.weekNumber} 周周报详情
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleViewReportDetail}
+                      className="text-sm text-white/80 hover:text-white flex items-center gap-1"
+                    >
+                      统计页查看
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <WeeklyReportCard report={latestReport} />
+                  <button
+                    onClick={() => setShowReportDetail(false)}
+                    className="w-full py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors"
+                  >
+                    收起详情
+                  </button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {settings.weatherNotificationEnabled && (
         <Card className={cn(

@@ -1,9 +1,18 @@
 import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Area, AreaChart, Legend } from 'recharts';
-import { TrendingUp, Droplets, AlertTriangle, MapPin, Calendar, BarChart3 } from 'lucide-react';
-import { useStatistics, usePredictions, useRecords } from '../store/useAppStore';
+import { TrendingUp, Droplets, AlertTriangle, MapPin, Calendar, BarChart3, FileText, RefreshCw } from 'lucide-react';
+import {
+  useStatistics,
+  usePredictions,
+  useRecords,
+  useLatestWeeklyReport,
+  useWeeklyReports,
+  useGenerateWeeklyReport,
+  useIsGeneratingReport,
+} from '../store/useAppStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import Heatmap from '../components/Heatmap';
+import WeeklyReportCard from '../components/WeeklyReportCard';
 import { getProbabilityBgLight } from '../utils/format';
 import { cn } from '../lib/utils';
 
@@ -11,6 +20,10 @@ export default function Statistics() {
   const statistics = useStatistics();
   const predictions = usePredictions();
   const records = useRecords();
+  const latestReport = useLatestWeeklyReport();
+  const weeklyReports = useWeeklyReports();
+  const generateWeeklyReport = useGenerateWeeklyReport();
+  const isGeneratingReport = useIsGeneratingReport();
 
   const hourlyChartData = useMemo(() => {
     if (!statistics) return [];
@@ -56,12 +69,67 @@ export default function Statistics() {
   );
   const currentMonthCount = currentMonthRecords.reduce((sum, d) => sum + d.count, 0);
 
+  const handleGenerateReport = () => {
+    generateWeeklyReport();
+  };
+
   return (
     <div className="p-4 space-y-6">
       <div className="pt-2">
         <h1 className="text-2xl font-bold text-slate-800 mb-1">统计分析</h1>
         <p className="text-slate-500 text-sm">洒水车出没规律深度分析</p>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-indigo-500" />
+              洒水车周报
+            </CardTitle>
+            <button
+              onClick={handleGenerateReport}
+              disabled={isGeneratingReport}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 text-sm font-medium hover:bg-indigo-100 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={cn('w-4 h-4', isGeneratingReport && 'animate-spin')} />
+              {isGeneratingReport ? '生成中...' : latestReport ? '重新生成' : '生成本周周报'}
+            </button>
+          </div>
+          {weeklyReports.length > 0 && (
+            <p className="text-xs text-slate-400 mt-1">
+              已生成 {weeklyReports.length} 份历史周报
+            </p>
+          )}
+        </CardHeader>
+        <CardContent>
+          {latestReport ? (
+            <WeeklyReportCard report={latestReport} />
+          ) : (
+            <div className="text-center py-8">
+              <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 mb-2">还没有周报</p>
+              <p className="text-sm text-slate-400 mb-4">
+                {records.length === 0
+                  ? '先记录一些洒水车出没记录吧'
+                  : '点击上方按钮生成本周周报'}
+              </p>
+              <button
+                onClick={handleGenerateReport}
+                disabled={isGeneratingReport || records.length === 0}
+                className={cn(
+                  'px-5 py-2.5 rounded-xl text-sm font-medium transition-colors',
+                  records.length === 0
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:opacity-90'
+                )}
+              >
+                立即生成第一份周报
+              </button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-2 gap-3">
         <Card gradient className="bg-gradient-to-br from-sky-500 to-blue-600">
