@@ -51,6 +51,8 @@ export default function History() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
   const [pendingExportFormat, setPendingExportFormat] = useState<ExportFormat>('csv');
+  const [exportDateStart, setExportDateStart] = useState('');
+  const [exportDateEnd, setExportDateEnd] = useState('');
   const [importReport, setImportReport] = useState<ImportReportType | null>(null);
   const [showImportReport, setShowImportReport] = useState(false);
 
@@ -107,6 +109,8 @@ export default function History() {
   const executeExport = (scope: ExportScope, format: ExportFormat) => {
     if (scope === 'dateRange') {
       setPendingExportFormat(format);
+      setExportDateStart(dateStart);
+      setExportDateEnd(dateEnd);
       setShowDateRangePicker(true);
       setShowExportMenu(false);
       return;
@@ -148,7 +152,7 @@ export default function History() {
   };
 
   const confirmDateRangeExport = () => {
-    if (!dateStart || !dateEnd) {
+    if (!exportDateStart || !exportDateEnd) {
       return;
     }
 
@@ -157,13 +161,13 @@ export default function History() {
 
     if (format === 'json') {
       const rangeRecords = records.filter(
-        (r) => r.date >= dateStart && r.date <= dateEnd
+        (r) => r.date >= exportDateStart && r.date <= exportDateEnd
       );
       const data = {
         version: '1.0',
         exportedAt: new Date().toISOString(),
         records: rangeRecords,
-        dateRange: { start: dateStart, end: dateEnd },
+        dateRange: { start: exportDateStart, end: exportDateEnd },
       };
       const blob = new Blob([JSON.stringify(data, null, 2)], {
         type: 'application/json',
@@ -171,20 +175,20 @@ export default function History() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${filename}-${dateStart}_to_${dateEnd}.json`;
+      a.download = `${filename}-${exportDateStart}_to_${exportDateEnd}.json`;
       a.click();
       URL.revokeObjectURL(url);
     } else {
       const content = exportRecordsCSV({
         scope: 'dateRange',
-        dateRange: { start: dateStart, end: dateEnd },
+        dateRange: { start: exportDateStart, end: exportDateEnd },
       });
-      downloadCSV(content, `${filename}-${dateStart}_to_${dateEnd}.csv`);
+      downloadCSV(content, `${filename}-${exportDateStart}_to_${exportDateEnd}.csv`);
     }
 
     setShowDateRangePicker(false);
-    setDateStart('');
-    setDateEnd('');
+    setExportDateStart('');
+    setExportDateEnd('');
     setPendingExportFormat('csv');
   };
 
@@ -520,8 +524,8 @@ export default function History() {
                 <button
                   onClick={() => {
                     setShowDateRangePicker(false);
-                    setDateStart('');
-                    setDateEnd('');
+                    setExportDateStart('');
+                    setExportDateEnd('');
                   }}
                   className="text-slate-400 hover:text-slate-600"
                 >
@@ -536,8 +540,8 @@ export default function History() {
                 </label>
                 <input
                   type="date"
-                  value={dateStart}
-                  onChange={(e) => setDateStart(e.target.value)}
+                  value={exportDateStart}
+                  onChange={(e) => setExportDateStart(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none"
                 />
               </div>
@@ -547,18 +551,18 @@ export default function History() {
                 </label>
                 <input
                   type="date"
-                  value={dateEnd}
-                  onChange={(e) => setDateEnd(e.target.value)}
+                  value={exportDateEnd}
+                  onChange={(e) => setExportDateEnd(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none"
                 />
               </div>
-              {dateStart && dateEnd && (
+              {exportDateStart && exportDateEnd && (
                 <div className="text-sm text-slate-500 bg-sky-50 rounded-lg p-3">
                   预计导出{' '}
                   <span className="font-semibold text-sky-700">
                     {
                       records.filter(
-                        (r) => r.date >= dateStart && r.date <= dateEnd
+                        (r) => r.date >= exportDateStart && r.date <= exportDateEnd
                       ).length
                     }
                   </span>{' '}
@@ -570,15 +574,15 @@ export default function History() {
                   variant="ghost"
                   onClick={() => {
                     setShowDateRangePicker(false);
-                    setDateStart('');
-                    setDateEnd('');
+                    setExportDateStart('');
+                    setExportDateEnd('');
                   }}
                 >
                   取消
                 </Button>
                 <Button
                   onClick={confirmDateRangeExport}
-                  disabled={!dateStart || !dateEnd}
+                  disabled={!exportDateStart || !exportDateEnd}
                 >
                   确认导出
                 </Button>
