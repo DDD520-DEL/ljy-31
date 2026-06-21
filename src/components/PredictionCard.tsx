@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { getProbabilityColor, getProbabilityBgLight, getConfidenceLabel, getConfidenceColor } from '../utils/format';
 import { RoadPrediction } from '../types';
-import { useIsFavoriteRoad, useToggleFavoriteRoad } from '../store/useAppStore';
-import { Droplets, MapPin, TrendingUp, Star } from 'lucide-react';
+import { useIsFavoriteRoad, useToggleFavoriteRoad, useWeather } from '../store/useAppStore';
+import { useRoadWeatherAdjustment } from '../hooks/useWeather';
+import { Droplets, MapPin, TrendingUp, Star, CloudRain } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface PredictionCardProps {
@@ -18,6 +19,8 @@ export default function PredictionCard({
   highlight = false,
   showFavorite = true,
 }: PredictionCardProps) {
+  const weather = useWeather();
+  const weatherAdjustment = useRoadWeatherAdjustment(prediction.splashProbability);
   const splashPercent = Math.round(prediction.splashProbability * 100);
   const isFavorite = useIsFavoriteRoad(prediction.roadName);
   const toggleFavorite = useToggleFavoriteRoad();
@@ -71,15 +74,28 @@ export default function PredictionCard({
           <div className="text-right">
             <div className="flex items-center gap-1 text-sm">
               <Droplets
-                className={`w-4 h-4 ${splashPercent >= 40 ? 'text-orange-500' : 'text-slate-400'}`}
+                className={`w-4 h-4 ${weatherAdjustment.adjustedPercent >= 40 ? 'text-orange-500' : 'text-slate-400'}`}
               />
               <span
-                className={`font-medium ${splashPercent >= 40 ? 'text-orange-600' : 'text-slate-600'}`}
+                className={`font-medium ${weatherAdjustment.adjustedPercent >= 40 ? 'text-orange-600' : 'text-slate-600'}`}
               >
-                {splashPercent}%
+                {weatherAdjustment.adjustedPercent}%
               </span>
+              {weather && weatherAdjustment.adjustmentFactor !== 1.0 && (
+                <span className={cn(
+                  'text-xs font-medium ml-1',
+                  weatherAdjustment.changeColor
+                )}>
+                  {weatherAdjustment.changeText}
+                </span>
+              )}
             </div>
-            <p className="text-xs text-slate-400">溅水概率</p>
+            <p className="text-xs text-slate-400">
+              溅水概率
+              {weather && weatherAdjustment.adjustmentFactor !== 1.0 && (
+                <span className="text-slate-300"> · 原始 {weatherAdjustment.originalPercent}%</span>
+              )}
+            </p>
           </div>
         </div>
       </div>
@@ -110,10 +126,18 @@ export default function PredictionCard({
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <TrendingUp className="w-4 h-4" />
           <span>今日预测</span>
+          {weather && weatherAdjustment.adjustmentFactor !== 1.0 && (
+            <span className="flex items-center gap-1 text-xs">
+              <CloudRain className="w-3 h-3" />
+              <span className={weatherAdjustment.changeColor}>
+                {weatherAdjustment.changeText}
+              </span>
+            </span>
+          )}
           <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
             <div
-              className={`h-full ${getProbabilityColor(prediction.splashProbability)} transition-all duration-500`}
-              style={{ width: `${Math.min(splashPercent + 20, 100)}%` }}
+              className={`h-full ${getProbabilityColor(weatherAdjustment.adjustedProbability)} transition-all duration-500`}
+              style={{ width: `${Math.min(weatherAdjustment.adjustedPercent + 20, 100)}%` }}
             />
           </div>
         </div>

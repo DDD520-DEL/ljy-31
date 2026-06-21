@@ -43,17 +43,38 @@ export interface StatisticsData {
   monthlyTrend: Array<{ date: string; count: number }>;
 }
 
+export type WeatherType = 'sunny' | 'cloudy' | 'rainy' | 'stormy' | 'snowy';
+
+export interface WeatherData {
+  type: WeatherType;
+  temperature: number;
+  humidity: number;
+  description: string;
+  icon: string;
+  windSpeed: number;
+  lastUpdated: number;
+}
+
+export interface WeatherAdjustment {
+  originalProbability: number;
+  adjustedProbability: number;
+  adjustmentFactor: number;
+  reason: string;
+}
+
 export interface AppSettings {
   theme: 'light' | 'dark';
   reminderEnabled: boolean;
   reminderMinutes: number;
   favoriteRoads: string[];
+  weatherNotificationEnabled: boolean;
 }
 
 export enum StorageKeys {
   RECORDS = 'sprinkler_records',
   PREDICTIONS = 'sprinkler_predictions',
   SETTINGS = 'sprinkler_settings',
+  WEATHER = 'sprinkler_weather',
 }
 
 export interface AppState {
@@ -61,7 +82,9 @@ export interface AppState {
   predictions: RoadPrediction[];
   statistics: StatisticsData | null;
   settings: AppSettings;
+  weather: WeatherData | null;
   isLoading: boolean;
+  isWeatherLoading: boolean;
   addRecord: (record: Omit<SprinklerRecord, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateRecord: (id: string, record: Partial<SprinklerRecord>) => void;
   deleteRecord: (id: string) => void;
@@ -70,4 +93,6 @@ export interface AppState {
   refreshStatistics: () => void;
   loadMockData: () => void;
   exportData: () => string;
+  refreshWeather: () => Promise<WeatherData>;
+  getWeatherAdjustment: (probability: number) => WeatherAdjustment;
 }

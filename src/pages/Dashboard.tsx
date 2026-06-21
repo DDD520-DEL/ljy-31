@@ -1,13 +1,15 @@
 import { useNavigate } from 'react-router-dom';
-import { Droplets, Plus, Bell, AlertTriangle, ChevronRight, Star, Settings as SettingsIcon } from 'lucide-react';
+import { Droplets, Plus, Bell, AlertTriangle, ChevronRight, Star, Settings as SettingsIcon, CloudRain, Wind, Droplets as DropletsIcon, RefreshCw } from 'lucide-react';
 import { useTodayPredictions, useSplashStatistics, useRecentRecords, useUpcomingReminders } from '../hooks/usePredictions';
 import { useSettings, useFavoritePredictions } from '../store/useAppStore';
+import { useWeatherData, useWeatherHint, useOverallWeatherRisk } from '../hooks/useWeather';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import { Button } from '../components/Button';
 import PredictionCard from '../components/PredictionCard';
 import RecordCard from '../components/RecordCard';
 import TimeAxis from '../components/TimeAxis';
 import { getConfidenceLabel, getConfidenceColor } from '../utils/format';
+import { cn } from '../lib/utils';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -17,6 +19,9 @@ export default function Dashboard() {
   const settings = useSettings();
   const favoritePredictions = useFavoritePredictions();
   const upcomingReminders = useUpcomingReminders(settings.reminderMinutes);
+  const { weather, isWeatherLoading, refreshWeather } = useWeatherData();
+  const weatherHint = useWeatherHint();
+  const weatherRisk = useOverallWeatherRisk();
 
   const currentHour = new Date().getHours();
   const timeAxisData = Array.from({ length: 24 }, (_, i) => ({
@@ -59,6 +64,80 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {settings.weatherNotificationEnabled && (
+        <Card className={cn(
+          'border-2 overflow-hidden',
+          weatherRisk.borderColor,
+          weatherRisk.bgColor
+        )}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CloudRain className={cn('w-5 h-5', weatherRisk.riskColor)} />
+                <CardTitle>天气预警</CardTitle>
+              </div>
+              <button
+                onClick={() => refreshWeather()}
+                disabled={isWeatherLoading}
+                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/50 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={cn('w-4 h-4', isWeatherLoading && 'animate-spin', weatherRisk.riskColor)} />
+              </button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start gap-4">
+              <div className="text-5xl">
+                {isWeatherLoading ? '🌤️' : weatherHint.icon}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xl font-bold text-slate-800">
+                    {isWeatherLoading ? '加载中...' : weatherHint.description}
+                  </span>
+                  <span className={cn(
+                    'px-2 py-0.5 rounded-full text-xs font-medium',
+                    weatherRisk.bgColor,
+                    weatherRisk.riskColor
+                  )}>
+                    {weatherRisk.riskText}
+                  </span>
+                </div>
+                {weather && (
+                  <div className="flex flex-wrap gap-4 text-sm text-slate-600">
+                    <span className="flex items-center gap-1">
+                      🌡️ {weather.temperature}°C
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <DropletsIcon className="w-3.5 h-3.5" />
+                      {weather.humidity}%
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Wind className="w-3.5 h-3.5" />
+                      {weather.windSpeed}km/h
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white/60 rounded-xl p-4 backdrop-blur-sm">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className={cn('w-5 h-5 flex-shrink-0 mt-0.5', weatherRisk.riskColor)} />
+                <div>
+                  <p className={cn('font-medium mb-1', weatherRisk.riskColor)}>
+                    {weatherHint.hint}
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    {weatherRisk.description}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {settings.reminderEnabled && upcomingReminders.length > 0 && (
         <Card gradient className="overflow-hidden">

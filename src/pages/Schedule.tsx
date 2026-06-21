@@ -1,16 +1,21 @@
 import { useState, useMemo } from 'react';
-import { Search, MapPin, Droplets, Clock, ChevronDown, ChevronUp, Filter } from 'lucide-react';
-import { usePredictions } from '../store/useAppStore';
+import { Search, MapPin, Droplets, Clock, ChevronDown, ChevronUp, Filter, CloudRain } from 'lucide-react';
+import { usePredictions, useWeather, useGetWeatherAdjustment, useRefreshWeather, useIsWeatherLoading } from '../store/useAppStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import PredictionCard from '../components/PredictionCard';
 import TimeAxis from '../components/TimeAxis';
 import { getProbabilityColor, getConfidenceLabel, getConfidenceColor } from '../utils/format';
+import { getProbabilityChangeText, getProbabilityChangeColor } from '../utils/weather';
 import { cn } from '../lib/utils';
 
 type SortType = 'recordCount' | 'splashProbability' | 'roadName';
 
 export default function Schedule() {
   const predictions = usePredictions();
+  const weather = useWeather();
+  const getWeatherAdjustment = useGetWeatherAdjustment();
+  const refreshWeather = useRefreshWeather();
+  const isWeatherLoading = useIsWeatherLoading();
   const [searchQuery, setSearchQuery] = useState('');
   const [sortType, setSortType] = useState<SortType>('recordCount');
   const [expandedRoad, setExpandedRoad] = useState<string | null>(null);
@@ -58,6 +63,39 @@ export default function Schedule() {
         <h1 className="text-2xl font-bold text-slate-800 mb-1">洒水车时刻表</h1>
         <p className="text-slate-500 text-sm">各路段洒水车出没预测时间</p>
       </div>
+
+      {weather && (
+        <Card className="border-2 border-sky-200 bg-sky-50/50">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="text-3xl">{weather.icon}</div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-800">{weather.description}</span>
+                    <span className="text-sm text-slate-500">{weather.temperature}°C</span>
+                  </div>
+                  <p className="text-sm text-slate-500">
+                    已根据天气调整预测概率
+                    {weather.type !== 'cloudy' && (
+                      <span className="ml-1 text-sky-600 font-medium">
+                        {getProbabilityChangeText(getWeatherAdjustment(0.5))}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => refreshWeather()}
+                disabled={isWeatherLoading}
+                className="w-10 h-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                <CloudRain className={cn('w-5 h-5', isWeatherLoading && 'animate-spin')} />
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -137,10 +175,25 @@ export default function Schedule() {
                         <p className="text-xs text-slate-500">被溅次数</p>
                       </div>
                       <div>
-                        <p className="text-2xl font-bold text-sky-600">
-                          {Math.round(prediction.splashProbability * 100)}%
+                        <div className="flex items-center justify-center gap-1">
+                          <p className="text-2xl font-bold text-sky-600">
+                            {Math.round(getWeatherAdjustment(prediction.splashProbability).adjustedProbability * 100)}%
+                          </p>
+                          {weather && getWeatherAdjustment(prediction.splashProbability).adjustmentFactor !== 1.0 && (
+                            <span className={cn(
+                              'text-sm font-medium',
+                              getProbabilityChangeColor(getWeatherAdjustment(prediction.splashProbability))
+                            )}>
+                              {getProbabilityChangeText(getWeatherAdjustment(prediction.splashProbability))}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          溅水概率
+                          {weather && getWeatherAdjustment(prediction.splashProbability).adjustmentFactor !== 1.0 && (
+                            <span className="text-slate-400"> · 原始 {Math.round(prediction.splashProbability * 100)}%</span>
+                          )}
                         </p>
-                        <p className="text-xs text-slate-500">溅水概率</p>
                       </div>
                     </div>
 
@@ -150,29 +203,42 @@ export default function Schedule() {
                         预测经过时间
                       </p>
                       <div className="space-y-2">
-                        {prediction.predictedTimes.map((time, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between p-3 bg-white rounded-xl"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div
-                                className={`w-3 h-3 rounded-full ${getProbabilityColor(time.probability)}`}
-                              />
-                              <span className="font-semibold text-slate-800">{time.averageTime}</span>
+                        {prediction.predictedTimes.map((time, idx) => {
+                          const adjusted = getWeatherAdjustment(time.probability);
+                          return (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between p-3 bg-white rounded-xl"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`w-3 h-3 rounded-full ${getProbabilityColor(adjusted.adjustedProbability)}`}
+                                />
+                                <span className="font-semibold text-slate-800">{time.averageTime}</span>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <span
+                                  className={`text-sm ${getConfidenceColor(time.confidence)}`}
+                                >
+                                  置信度 {getConfidenceLabel(time.confidence)} ({Math.round(time.confidence * 100)}%)
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-sm text-slate-500">
+                                    溅水概率 {Math.round(adjusted.adjustedProbability * 100)}%
+                                  </span>
+                                  {weather && adjusted.adjustmentFactor !== 1.0 && (
+                                    <span className={cn(
+                                      'text-xs font-medium',
+                                      getProbabilityChangeColor(adjusted)
+                                    )}>
+                                      {getProbabilityChangeText(adjusted)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-4">
-                              <span
-                                className={`text-sm ${getConfidenceColor(time.confidence)}`}
-                              >
-                                置信度 {getConfidenceLabel(time.confidence)} ({Math.round(time.confidence * 100)}%)
-                              </span>
-                              <span className="text-sm text-slate-500">
-                                溅水概率 {Math.round(time.probability * 100)}%
-                              </span>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
 

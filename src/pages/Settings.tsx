@@ -12,6 +12,7 @@ import {
   Trash2,
   AlertTriangle,
   Info,
+  CloudRain,
 } from 'lucide-react';
 import {
   useSettings,
@@ -47,6 +48,10 @@ export default function SettingsPage() {
 
   const handleReminderMinutesChange = (minutes: number) => {
     updateSettings({ reminderMinutes: minutes });
+  };
+
+  const handleWeatherNotificationToggle = () => {
+    updateSettings({ weatherNotificationEnabled: !settings.weatherNotificationEnabled });
   };
 
   const handleExport = () => {
@@ -140,6 +145,53 @@ export default function SettingsPage() {
             <p className="text-xs text-slate-400 mt-2">
               将在洒水车预测经过前 {settings.reminderMinutes} 分钟提醒您
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CloudRain className="w-5 h-5 text-sky-500" />
+            天气预警
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="font-medium text-slate-800">天气预警通知</p>
+              <p className="text-sm text-slate-500 mt-0.5">
+                根据天气情况调整洒水车出没概率预测
+              </p>
+            </div>
+            <button
+              onClick={handleWeatherNotificationToggle}
+              className={toggleSwitchClass(settings.weatherNotificationEnabled)}
+              aria-pressed={settings.weatherNotificationEnabled}
+            >
+              <span
+                aria-hidden="true"
+                className={toggleDotClass(settings.weatherNotificationEnabled)}
+              />
+            </button>
+          </div>
+
+          <div className={cn(!settings.weatherNotificationEnabled && 'opacity-50 pointer-events-none')}>
+            <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <CloudRain className="w-5 h-5 text-sky-500 flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-sky-800 mb-1">天气修正规则</p>
+                  <ul className="space-y-1 text-sky-700">
+                    <li>☀️ 晴天：洒水车概率 +20%</li>
+                    <li>⛅ 多云：洒水车概率 不变</li>
+                    <li>🌧️ 雨天：洒水车概率 -60%</li>
+                    <li>⛈️ 暴雨：洒水车概率 -90%</li>
+                    <li>❄️ 下雪：洒水车概率 -80%</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

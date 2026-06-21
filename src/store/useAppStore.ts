@@ -5,17 +5,20 @@ import {
   AppSettings,
   StorageKeys,
   RoadPrediction,
+  WeatherData,
 } from '../types';
 import { storage } from '../utils/storage';
 import { generateAllPredictions, generateStatistics } from '../utils/analysis';
 import { generateId, formatDate, formatTime } from '../utils/format';
 import { mockRecords } from '../data/mockRecords';
+import { fetchWeatherData, calculateWeatherAdjustment, shouldRefreshWeather } from '../utils/weather';
 
 const defaultSettings: AppSettings = {
   theme: 'light',
   reminderEnabled: true,
   reminderMinutes: 15,
   favoriteRoads: [],
+  weatherNotificationEnabled: true,
 };
 
 const getInitialRecords = (): SprinklerRecord[] => {
@@ -24,17 +27,28 @@ const getInitialRecords = (): SprinklerRecord[] => {
   return mockRecords;
 };
 
+const getInitialWeather = (): WeatherData | null => {
+  const stored = storage.get<WeatherData | null>(StorageKeys.WEATHER, null);
+  if (stored && !shouldRefreshWeather(stored.lastUpdated)) {
+    return stored;
+  }
+  return null;
+};
+
 const initialRecords = getInitialRecords();
 const initialPredictions = generateAllPredictions(initialRecords);
 const initialStatistics = generateStatistics(initialRecords);
 const initialSettings = storage.get<AppSettings>(StorageKeys.SETTINGS, defaultSettings);
+const initialWeather = getInitialWeather();
 
 export const useAppStore = create<AppState>((set, get) => ({
   records: initialRecords,
   predictions: initialPredictions,
   statistics: initialStatistics,
   settings: initialSettings,
+  weather: initialWeather,
   isLoading: false,
+  isWeatherLoading: false,
 
   addRecord: (recordData) => {
     const now = Date.now();
@@ -125,6 +139,32 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     return JSON.stringify(exportData, null, 2);
   },
+
+  refreshWeather: async () => {
+    set({ isWeatherLoading: true });
+    try {
+      const weatherData = await fetchWeatherData();
+      storage.set(StorageKeys.WEATHER, weatherData);
+      set({ weather: weatherData, isWeatherLoading: false });
+      return weatherData;
+    } catch (error) {
+      set({ isWeatherLoading: false });
+      throw error;
+    }
+  },
+
+  getWeatherAdjustment: (probability: number) => {
+    const { weather } = get();
+    if (!weather) {
+      return {
+        originalProbability: probability,
+        adjustedProbability: probability,
+        adjustmentFactor: 1.0,
+        reason: '暂无天气数据',
+      };
+    }
+    return calculateWeatherAdjustment(probability, weather.type);
+  },
 }));
 
 export const useRecords = () => useAppStore((state) => state.records);
@@ -177,3 +217,8 @@ export const useFavoritePredictions = () => {
   const favoriteRoads = useAppStore((state) => state.settings.favoriteRoads);
   return predictions.filter((p) => favoriteRoads.includes(p.roadName));
 };
+
+export const useWeather = () => useAppStore((state) => state.weather);
+export const useIsWeatherLoading = () => useAppStore((state) => state.isWeatherLoading);
+export const useRefreshWeather = () => useAppStore((state) => state.refreshWeather);
+export const useGetWeatherAdjustment = () => useAppStore((state) => state.getWeatherAdjustment);
