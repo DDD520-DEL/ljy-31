@@ -1,12 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Droplets, MapPin, Clock, MessageSquare, Check, X, ArrowLeft } from 'lucide-react';
-import { useAddRecord, useUpdateRecord, useRecords } from '../store/useAppStore';
+import { Droplets, MapPin, Clock, MessageSquare, Check, X, ArrowLeft, Camera, Sparkles } from 'lucide-react';
+import { useAddRecord, useUpdateRecord, useRecords, useAddPhoto, useGetPhotosByRecordId, usePhotos, useAppStore } from '../store/useAppStore';
 import { useRoadList } from '../hooks/usePredictions';
 import { Button } from '../components/Button';
 import { Card, CardContent } from '../components/Card';
-import { formatDate, formatTime, parseTimeString, getDayOfWeek } from '../utils/format';
+import { formatDate, formatTime, parseTimeString, getDayOfWeek, generateId } from '../utils/format';
 import { cn } from '../lib/utils';
+import PhotoUploader, { TempPhoto } from '../components/PhotoUploader';
+import PhotoViewer from '../components/PhotoViewer';
+import { Photo, OCRResult } from '../types';
 
 const directions = [
   { value: 'east', label: '向东' },
@@ -22,11 +25,20 @@ export default function Record() {
   const updateRecord = useUpdateRecord();
   const records = useRecords();
   const roadList = useRoadList();
+  const addPhoto = useAddPhoto();
+  const getPhotosByRecordId = useGetPhotosByRecordId();
+  const allPhotos = usePhotos();
 
   const existingRecord = id ? records.find((r) => r.id === id) : null;
   const isEditing = !!existingRecord;
 
+  const existingPhotos = useMemo(() => {
+    if (!existingRecord) return [];
+    return getPhotosByRecordId(existingRecord.id);
+  }, [existingRecord, getPhotosByRecordId, allPhotos]);
+
   const now = new Date();
+  const tempRecordId = useMemo(() => id || `temp_${generateId()}`, [id]);
   const [date, setDate] = useState(existingRecord?.date || formatDate(now.getTime()));
   const [time, setTime] = useState(existingRecord?.time || formatTime(now.getTime()));
   const [road, setRoad] = useState(existingRecord?.road || '');
@@ -36,9 +48,48 @@ export default function Record() {
   const [showRoadSuggestions, setShowRoadSuggestions] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [tempPhotos, setTempPhotos] = useState<TempPhoto[]>(
+    existingPhotos.map((p) => ({ ...p, tempId: p.id }))
+  );
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [ocrApplied, setOcrApplied] = useState<Set<string>>(new Set());
+
   const filteredRoads = roadList.filter(
     (r) => r.toLowerCase().includes(road.toLowerCase()) && r !== road
   );
+
+  const handleOCRResult = (index: number, result: OCRResult) => {
+    if (result.confidence < 0.5) return;
+
+    const photo = tempPhotos[index];
+    if (!photo || ocrApplied.has(photo.tempId)) return;
+
+    let applied = false;
+
+    if (result.detectedDate) {
+      setDate(result.detectedDate);
+      applied = true;
+    }
+    if (result.detectedTime) {
+      setTime(result.detectedTime);
+      applied = true;
+    }
+    if (result.detectedLocation && !road.trim()) {
+      setRoad(result.detectedLocation);
+      applied = true;
+    }
+
+    if (applied) {
+      setOcrApplied((prev) => new Set(prev).add(photo.tempId));
+    }
+  };
+
+  const viewerPhotos: Photo[] = tempPhotos.map((p) => ({
+    ...p,
+    id: p.tempId,
+    uploadedAt: Date.now(),
+  }));
 
   const handleSubmit = async () => {
     if (!road.trim() || isSplashed === null) {
@@ -51,6 +102,8 @@ export default function Record() {
       const { hour, minute } = parseTimeString(time);
       const dateTime = new Date(`${date}T${time}`);
       const timestamp = dateTime.getTime();
+
+      let recordId: string;
 
       if (isEditing && id) {
         updateRecord(id, {
@@ -65,8 +118,9 @@ export default function Record() {
           direction: (direction as 'east' | 'west' | 'south' | 'north') || undefined,
           note: note.trim() || undefined,
         });
+        recordId = id;
       } else {
-        addRecord({
+        const newRecord = {
           timestamp,
           date,
           time,
@@ -77,6 +131,19 @@ export default function Record() {
           isSplashed,
           direction: (direction as 'east' | 'west' | 'south' | 'north') || undefined,
           note: note.trim() || undefined,
+        };
+        addRecord(newRecord);
+        const recordsNow = useAppStore.getState().records;
+        recordId = recordsNow[0]?.id || id || '';
+      }
+
+      if (tempPhotos.length > 0 && recordId) {
+        tempPhotos.forEach((tp) => {
+          const { tempId, ...photoData } = tp;
+          addPhoto({
+            ...photoData,
+            recordId,
+          });
         });
       }
 
@@ -248,6 +315,27 @@ export default function Record() {
               className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none transition-all text-slate-800 placeholder-slate-400 resize-none"
             />
           </div>
+
+          <div className="space-y-3 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <Camera className="w-4 h-4 text-sky-500" />
+                现场照片
+              </label>
+              <div className="flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>支持 OCR 自动识别时间和地点</span>
+              </div>
+            </div>
+            <PhotoUploader
+              photos={tempPhotos}
+              onChange={setTempPhotos}
+              onOCRResult={handleOCRResult}
+              recordId={tempRecordId}
+              maxPhotos={5}
+              disabled={isSubmitting}
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -262,6 +350,16 @@ export default function Record() {
           {isEditing ? '保存修改' : '提交记录'}
         </Button>
       </div>
+
+      {viewerOpen && (
+        <PhotoViewer
+          photos={viewerPhotos}
+          currentIndex={viewerIndex}
+          onClose={() => setViewerOpen(false)}
+          onPrev={() => setViewerIndex((i) => Math.max(0, i - 1))}
+          onNext={() => setViewerIndex((i) => Math.min(viewerPhotos.length - 1, i + 1))}
+        />
+      )}
     </div>
   );
 }

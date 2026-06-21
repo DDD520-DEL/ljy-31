@@ -23,6 +23,9 @@ import {
   BellRing,
   MapPin,
   BarChart3,
+  HardDrive,
+  Camera,
+  Image,
 } from 'lucide-react';
 import {
   useSettings,
@@ -34,7 +37,12 @@ import {
   useLatestWeeklyReport,
   useGenerateWeeklyReport,
   useIsGeneratingReport,
+  useStorageInfo,
+  usePhotos,
+  useSetStorageQuota,
+  useClearAllPhotos,
 } from '../store/useAppStore';
+import { formatSize, getStorageUsagePercentage, DEFAULT_STORAGE_QUOTA_MB } from '../utils/storageManager';
 import {
   usePushSettings,
   useWsStatus,
@@ -85,7 +93,17 @@ export default function SettingsPage() {
   const latestReport = useLatestWeeklyReport();
   const generateWeeklyReport = useGenerateWeeklyReport();
   const isGeneratingReport = useIsGeneratingReport();
+  const storageInfo = useStorageInfo();
+  const photos = usePhotos();
+  const setStorageQuota = useSetStorageQuota();
+  const clearAllPhotos = useClearAllPhotos();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showClearPhotosConfirm, setShowClearPhotosConfirm] = useState(false);
+  const [showQuotaSettings, setShowQuotaSettings] = useState(false);
+
+  const quotaOptions = [50, 100, 200, 500, 1000];
+  const currentQuotaMB = Math.round(storageInfo.quotaLimit / (1024 * 1024));
+  const usagePercent = getStorageUsagePercentage(storageInfo);
 
   const pushSettings = usePushSettings();
   const wsStatus = useWsStatus();
@@ -199,6 +217,15 @@ export default function SettingsPage() {
   const handleReset = () => {
     localStorage.clear();
     window.location.reload();
+  };
+
+  const handleClearPhotos = () => {
+    clearAllPhotos();
+    setShowClearPhotosConfirm(false);
+  };
+
+  const handleQuotaChange = (quotaMB: number) => {
+    setStorageQuota(quotaMB);
   };
 
   const toggleSwitchClass = (enabled: boolean) =>
@@ -909,6 +936,200 @@ export default function SettingsPage() {
                 <div className="text-left">
                   <p className="font-medium text-red-600">清除所有数据</p>
                   <p className="text-xs text-slate-500">删除所有记录和设置</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-slate-400" />
+            </button>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <HardDrive className="w-5 h-5 text-sky-500" />
+            存储管理
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-xl bg-sky-100 flex items-center justify-center">
+                  <Image className="w-5 h-5 text-sky-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-slate-800">照片存储</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    已保存 {storageInfo.photoCount} 张照片
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="font-medium text-slate-800">
+                  {formatSize(storageInfo.usedSize)}
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  / {formatSize(storageInfo.quotaLimit)}
+                </p>
+              </div>
+            </div>
+
+            <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+              <div
+                className={cn(
+                  'h-full rounded-full transition-all duration-500',
+                  storageInfo.quotaExceeded
+                    ? 'bg-red-500'
+                    : storageInfo.quotaWarning
+                    ? 'bg-amber-500'
+                    : 'bg-sky-500'
+                )}
+                style={{ width: `${Math.min(100, usagePercent)}%` }}
+              />
+            </div>
+
+            <div className="flex items-center gap-2 text-xs">
+              <span
+                className={cn(
+                  'inline-flex items-center px-2 py-0.5 rounded-full font-medium',
+                  storageInfo.quotaExceeded
+                    ? 'bg-red-100 text-red-700'
+                    : storageInfo.quotaWarning
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-emerald-100 text-emerald-700'
+                )}
+              >
+                {storageInfo.quotaExceeded
+                  ? '已超出限额'
+                  : storageInfo.quotaWarning
+                  ? '即将超出限额'
+                  : '存储空间充足'}
+              </span>
+              <span className="text-slate-400">
+                使用率 {usagePercent.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-100">
+            <button
+              onClick={() => setShowQuotaSettings(!showQuotaSettings)}
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center">
+                  <Settings className="w-4.5 h-4.5 text-indigo-600" />
+                </div>
+                <div className="text-left">
+                  <p className="font-medium text-slate-800 text-sm">存储限额设置</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    当前限额: {currentQuotaMB} MB
+                  </p>
+                </div>
+              </div>
+              <ChevronRight
+                className={cn(
+                  'w-5 h-5 text-slate-400 transition-transform',
+                  showQuotaSettings && 'rotate-90'
+                )}
+              />
+            </button>
+
+            {showQuotaSettings && (
+              <div className="mt-3 p-4 bg-slate-50 rounded-xl space-y-3">
+                <p className="text-xs font-medium text-slate-600">选择存储限额</p>
+                <div className="grid grid-cols-5 gap-2">
+                  {quotaOptions.map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => handleQuotaChange(option)}
+                      className={cn(
+                        'py-2 rounded-lg text-xs font-medium transition-all',
+                        currentQuotaMB === option
+                          ? 'bg-sky-500 text-white shadow-md shadow-sky-500/30'
+                          : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
+                      )}
+                    >
+                      {option >= 1000 ? `${option / 1000} GB` : `${option} MB`}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-400">
+                  照片以压缩格式存储，每张约 100-300 KB
+                </p>
+              </div>
+            )}
+          </div>
+
+          {showClearPhotosConfirm ? (
+            <div className="p-4 rounded-xl bg-red-50 border border-red-200">
+              <div className="flex items-start gap-3 mb-3">
+                <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-red-800">确认清除所有照片？</p>
+                  <p className="text-sm text-red-600 mt-1">
+                    此操作不可恢复，{storageInfo.photoCount} 张照片将被永久删除
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={handleClearPhotos}
+                  className="flex-1"
+                  disabled={photos.length === 0}
+                >
+                  确认清除
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowClearPhotosConfirm(false)}
+                  className="flex-1"
+                >
+                  取消
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowClearPhotosConfirm(true)}
+              disabled={photos.length === 0}
+              className={cn(
+                'w-full flex items-center justify-between p-3 rounded-xl transition-colors border border-transparent',
+                photos.length === 0
+                  ? 'bg-slate-50 opacity-50 cursor-not-allowed'
+                  : 'bg-slate-50 hover:bg-red-50 hover:border-red-200'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={cn(
+                    'w-9 h-9 rounded-xl flex items-center justify-center',
+                    photos.length === 0 ? 'bg-slate-200' : 'bg-red-100'
+                  )}
+                >
+                  <Camera
+                    className={cn(
+                      'w-4.5 h-4.5',
+                      photos.length === 0 ? 'text-slate-400' : 'text-red-600'
+                    )}
+                  />
+                </div>
+                <div className="text-left">
+                  <p
+                    className={cn(
+                      'font-medium text-sm',
+                      photos.length === 0 ? 'text-slate-400' : 'text-red-600'
+                    )}
+                  >
+                    清除所有照片
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    释放 {formatSize(storageInfo.usedSize)} 存储空间
+                  </p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-slate-400" />

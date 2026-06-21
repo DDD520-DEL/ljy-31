@@ -1,6 +1,9 @@
-import { SprinklerRecord } from '../types';
+import { useState } from 'react';
+import { SprinklerRecord, Photo } from '../types';
 import { formatDateTime, getSplashStatusText, getDirectionText } from '../utils/format';
-import { Droplets, MapPin, Clock, Pencil, Trash2, MessageSquare } from 'lucide-react';
+import { Droplets, MapPin, Clock, Pencil, Trash2, MessageSquare, Camera, X } from 'lucide-react';
+import { useGetPhotosByRecordId, usePhotos } from '../store/useAppStore';
+import PhotoViewer from './PhotoViewer';
 
 interface RecordCardProps {
   record: SprinklerRecord;
@@ -10,6 +13,18 @@ interface RecordCardProps {
 }
 
 export default function RecordCard({ record, onEdit, onDelete, showActions = true }: RecordCardProps) {
+  const getPhotosByRecordId = useGetPhotosByRecordId();
+  const allPhotos = usePhotos();
+  const photos = getPhotosByRecordId(record.id);
+
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+
+  const openViewer = (index: number) => {
+    setViewerIndex(index);
+    setViewerOpen(true);
+  };
+
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 transition-all duration-200 hover:shadow-md">
       <div className="flex items-start justify-between">
@@ -47,7 +62,38 @@ export default function RecordCard({ record, onEdit, onDelete, showActions = tru
                   {getDirectionText(record.direction)}
                 </span>
               )}
+              {photos.length > 0 && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-sky-100 text-sky-700">
+                  <Camera className="w-3 h-3" />
+                  {photos.length}
+                </span>
+              )}
             </div>
+
+            {photos.length > 0 && (
+              <div className="mt-3 flex gap-2 flex-wrap">
+                {photos.slice(0, 4).map((photo, idx) => (
+                  <button
+                    key={photo.id}
+                    onClick={() => openViewer(idx)}
+                    className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 hover:border-sky-400 transition-colors flex-shrink-0 group"
+                  >
+                    <img
+                      src={photo.thumbnail}
+                      alt={photo.fileName}
+                      className="w-full h-full object-cover"
+                    />
+                    {idx === 3 && photos.length > 4 && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-xs font-medium">
+                        +{photos.length - 4}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-sky-500/0 group-hover:bg-sky-500/10 transition-colors" />
+                  </button>
+                ))}
+              </div>
+            )}
+
             {record.note && (
               <div className="mt-3 flex items-start gap-2 text-sm text-slate-500 bg-slate-50 rounded-lg p-3">
                 <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -80,6 +126,16 @@ export default function RecordCard({ record, onEdit, onDelete, showActions = tru
           </div>
         )}
       </div>
+
+      {viewerOpen && (
+        <PhotoViewer
+          photos={photos}
+          currentIndex={viewerIndex}
+          onClose={() => setViewerOpen(false)}
+          onPrev={() => setViewerIndex((i) => Math.max(0, i - 1))}
+          onNext={() => setViewerIndex((i) => Math.min(photos.length - 1, i + 1))}
+        />
+      )}
     </div>
   );
 }

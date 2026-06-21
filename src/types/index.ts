@@ -1,3 +1,37 @@
+export interface Photo {
+  id: string;
+  recordId: string;
+  dataUrl: string;
+  thumbnail: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  width: number;
+  height: number;
+  uploadedAt: number;
+  ocrResult?: OCRResult;
+  ocrStatus: 'pending' | 'processing' | 'success' | 'failed';
+}
+
+export interface OCRResult {
+  timestamp: number;
+  rawText: string;
+  detectedTime?: string;
+  detectedDate?: string;
+  detectedLocation?: string;
+  confidence: number;
+  error?: string;
+}
+
+export interface StorageInfo {
+  totalSize: number;
+  usedSize: number;
+  photoCount: number;
+  quotaLimit: number;
+  quotaWarning: boolean;
+  quotaExceeded: boolean;
+}
+
 export interface SprinklerRecord {
   id: string;
   timestamp: number;
@@ -10,6 +44,7 @@ export interface SprinklerRecord {
   isSplashed: boolean;
   direction?: 'east' | 'west' | 'south' | 'north';
   note?: string;
+  photos?: Photo[];
   createdAt: number;
   updatedAt: number;
 }
@@ -181,6 +216,8 @@ export enum StorageKeys {
   NOTIFICATIONS = 'sprinkler_notifications',
   PUSH_SETTINGS = 'sprinkler_push_settings',
   SEARCH_HISTORY = 'sprinkler_search_history',
+  PHOTOS = 'sprinkler_photos',
+  STORAGE_QUOTA = 'sprinkler_storage_quota',
 }
 
 export type SearchResultType = 'road' | 'record' | 'statistic';
@@ -242,6 +279,8 @@ export interface AppState {
   isLoading: boolean;
   isWeatherLoading: boolean;
   isGeneratingReport: boolean;
+  photos: Photo[];
+  storageInfo: StorageInfo;
   addRecord: (record: Omit<SprinklerRecord, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateRecord: (id: string, record: Partial<SprinklerRecord>) => void;
   deleteRecord: (id: string) => void;
@@ -258,4 +297,11 @@ export interface AppState {
   getWeeklyReportByWeek: (weekStart: string) => WeeklyReport | undefined;
   dismissWeeklyBanner: (reportId: string) => void;
   checkAndGenerateWeeklyReport: () => WeeklyReport | null;
+  addPhoto: (photo: Omit<Photo, 'id' | 'uploadedAt'>) => Photo;
+  updatePhoto: (id: string, updates: Partial<Photo>) => void;
+  deletePhoto: (id: string) => void;
+  getPhotosByRecordId: (recordId: string) => Photo[];
+  refreshStorageInfo: () => void;
+  setStorageQuota: (quotaMB: number) => void;
+  clearAllPhotos: () => void;
 }

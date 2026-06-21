@@ -9,6 +9,8 @@ import {
   WeeklyReportSettings,
   ExportOptions,
   ImportReport,
+  Photo,
+  StorageInfo,
 } from '../types';
 import { storage } from '../utils/storage';
 import {
@@ -21,6 +23,10 @@ import { generateId, formatDate, formatTime } from '../utils/format';
 import { mockRecords } from '../data/mockRecords';
 import { fetchWeatherData, calculateWeatherAdjustment, shouldRefreshWeather } from '../utils/weather';
 import { recordsToCSV, parseCSVToRecords } from '../utils/csv';
+import {
+  generateStorageInfo,
+  setStorageQuota as setStorageQuotaFn,
+} from '../utils/storageManager';
 
 const defaultWeeklyReportSettings: WeeklyReportSettings = {
   autoGenerate: true,
@@ -71,6 +77,10 @@ const getInitialWeeklyReports = (): WeeklyReport[] => {
   return storage.get<WeeklyReport[]>(StorageKeys.WEEKLY_REPORTS, []);
 };
 
+const getInitialPhotos = (): Photo[] => {
+  return storage.get<Photo[]>(StorageKeys.PHOTOS, []);
+};
+
 const initialRecords = getInitialRecords();
 const initialPredictions = generateAllPredictions(initialRecords);
 const initialStatistics = generateStatistics(initialRecords);
@@ -81,6 +91,8 @@ const initialLatestWeeklyReport =
   initialWeeklyReports.length > 0
     ? initialWeeklyReports.sort((a, b) => b.generatedAt - a.generatedAt)[0]
     : null;
+const initialPhotos = getInitialPhotos();
+const initialStorageInfo = generateStorageInfo(initialPhotos);
 
 export const useAppStore = create<AppState>((set, get) => ({
   records: initialRecords,
@@ -93,6 +105,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   isLoading: false,
   isWeatherLoading: false,
   isGeneratingReport: false,
+  photos: initialPhotos,
+  storageInfo: initialStorageInfo,
 
   addRecord: (recordData) => {
     const now = Date.now();
@@ -343,6 +357,75 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     return null;
   },
+
+  addPhoto: (photoData) => {
+    const now = Date.now();
+    const newPhoto: Photo = {
+      ...photoData,
+      id: generateId(),
+      uploadedAt: now,
+    };
+
+    set((state) => {
+      const newPhotos = [...state.photos, newPhoto];
+      storage.set(StorageKeys.PHOTOS, newPhotos);
+      return {
+        photos: newPhotos,
+        storageInfo: generateStorageInfo(newPhotos),
+      };
+    });
+
+    return newPhoto;
+  },
+
+  updatePhoto: (id, updates) => {
+    set((state) => {
+      const newPhotos = state.photos.map((photo) =>
+        photo.id === id ? { ...photo, ...updates } : photo
+      );
+      storage.set(StorageKeys.PHOTOS, newPhotos);
+      return {
+        photos: newPhotos,
+        storageInfo: generateStorageInfo(newPhotos),
+      };
+    });
+  },
+
+  deletePhoto: (id) => {
+    set((state) => {
+      const newPhotos = state.photos.filter((photo) => photo.id !== id);
+      storage.set(StorageKeys.PHOTOS, newPhotos);
+      return {
+        photos: newPhotos,
+        storageInfo: generateStorageInfo(newPhotos),
+      };
+    });
+  },
+
+  getPhotosByRecordId: (recordId) => {
+    return get().photos.filter((photo) => photo.recordId === recordId);
+  },
+
+  refreshStorageInfo: () => {
+    set((state) => ({
+      storageInfo: generateStorageInfo(state.photos),
+    }));
+  },
+
+  setStorageQuota: (quotaMB) => {
+    setStorageQuotaFn(quotaMB);
+    set((state) => ({
+      storageInfo: generateStorageInfo(state.photos),
+    }));
+  },
+
+  clearAllPhotos: () => {
+    storage.set(StorageKeys.PHOTOS, []);
+    set({
+      photos: [],
+      storageInfo: generateStorageInfo([]),
+    });
+  },
 }));
 
 export const useRecords = () => useAppStore((state) => state.records);
@@ -411,3 +494,13 @@ export const useGetWeeklyReportByWeek = () => useAppStore((state) => state.getWe
 export const useDismissWeeklyBanner = () => useAppStore((state) => state.dismissWeeklyBanner);
 export const useCheckAndGenerateWeeklyReport = () => useAppStore((state) => state.checkAndGenerateWeeklyReport);
 export const useWeeklyReportSettings = () => useAppStore((state) => state.settings.weeklyReport);
+
+export const usePhotos = () => useAppStore((state) => state.photos);
+export const useStorageInfo = () => useAppStore((state) => state.storageInfo);
+export const useAddPhoto = () => useAppStore((state) => state.addPhoto);
+export const useUpdatePhoto = () => useAppStore((state) => state.updatePhoto);
+export const useDeletePhoto = () => useAppStore((state) => state.deletePhoto);
+export const useGetPhotosByRecordId = () => useAppStore((state) => state.getPhotosByRecordId);
+export const useRefreshStorageInfo = () => useAppStore((state) => state.refreshStorageInfo);
+export const useSetStorageQuota = () => useAppStore((state) => state.setStorageQuota);
+export const useClearAllPhotos = () => useAppStore((state) => state.clearAllPhotos);

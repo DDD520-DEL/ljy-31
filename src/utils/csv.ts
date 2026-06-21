@@ -44,7 +44,8 @@ export const recordsToCSV = (records: SprinklerRecord[]): string => {
     CSV_HEADERS.map((field) => {
       const value = record[field as keyof SprinklerRecord];
       if (typeof value === 'boolean') return value ? '1' : '0';
-      return escapeCSV(value);
+      if (typeof value === 'string' || typeof value === 'number') return escapeCSV(value);
+      return '';
     }).join(',')
   );
   return [headerLine, ...dataLines].join('\n');
