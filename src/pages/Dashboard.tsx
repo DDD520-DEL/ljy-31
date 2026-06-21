@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Droplets, Plus, Bell, AlertTriangle, ChevronRight, Star, Settings as SettingsIcon, CloudRain, Wind, Droplets as DropletsIcon, RefreshCw, FileText, X, TrendingUp, TrendingDown, Minus, Zap } from 'lucide-react';
+import { Droplets, Plus, Bell, AlertTriangle, ChevronRight, Star, Settings as SettingsIcon, CloudRain, Wind, Droplets as DropletsIcon, RefreshCw, FileText, X, TrendingUp, TrendingDown, Minus, Zap, MapPin, BarChart3 } from 'lucide-react';
 import { useTodayPredictions, useSplashStatistics, useRecentRecords, useUpcomingReminders } from '../hooks/usePredictions';
 import {
   useSettings,
@@ -10,6 +10,13 @@ import {
   useDismissWeeklyBanner,
   useWeeklyReportSettings,
 } from '../store/useAppStore';
+import {
+  useNotifications,
+  useUnreadCount,
+  useMarkAsRead,
+  useSetShowNotificationPanel,
+} from '../store/useNotificationStore';
+import { NotificationType } from '../types';
 import { useWeatherData, useWeatherHint, useOverallWeatherRisk } from '../hooks/useWeather';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import { Button } from '../components/Button';
@@ -37,6 +44,11 @@ export default function Dashboard() {
   const weeklyReportSettings = useWeeklyReportSettings();
   const [showReportDetail, setShowReportDetail] = useState(false);
 
+  const notifications = useNotifications();
+  const unreadCount = useUnreadCount();
+  const markAsRead = useMarkAsRead();
+  const setShowNotificationPanel = useSetShowNotificationPanel();
+
   useEffect(() => {
     checkAndGenerateWeeklyReport();
   }, [checkAndGenerateWeeklyReport]);
@@ -52,6 +64,45 @@ export default function Dashboard() {
 
   const handleViewReportDetail = () => {
     navigate('/statistics');
+  };
+
+  const handleNotificationClick = (id: string) => {
+    markAsRead(id);
+  };
+
+  const handleViewAllNotifications = () => {
+    setShowNotificationPanel(true);
+  };
+
+  const getNotificationIcon = (type: NotificationType) => {
+    switch (type) {
+      case 'road_reminder':
+        return { icon: MapPin, color: 'text-sky-500', bgColor: 'bg-sky-100' };
+      case 'weather_alert':
+        return { icon: CloudRain, color: 'text-emerald-500', bgColor: 'bg-emerald-100' };
+      case 'weekly_report':
+        return { icon: BarChart3, color: 'text-indigo-500', bgColor: 'bg-indigo-100' };
+      case 'system':
+        return { icon: Bell, color: 'text-amber-500', bgColor: 'bg-amber-100' };
+      default:
+        return { icon: Bell, color: 'text-slate-500', bgColor: 'bg-slate-100' };
+    }
+  };
+
+  const formatNotificationTime = (timestamp: number): string => {
+    const now = Date.now();
+    const diff = now - timestamp;
+
+    if (diff < 60000) {
+      return '刚刚';
+    } else if (diff < 3600000) {
+      return `${Math.floor(diff / 60000)} 分钟前`;
+    } else if (diff < 86400000) {
+      return `${Math.floor(diff / 3600000)} 小时前`;
+    } else {
+      const date = new Date(timestamp);
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    }
   };
 
   const currentHour = new Date().getHours();
@@ -246,6 +297,71 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {notifications.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-rose-500 flex items-center justify-center shadow-md">
+                  <Bell className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-slate-800">最近通知</CardTitle>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {unreadCount > 0 ? `${unreadCount} 条未读` : '全部已读'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleViewAllNotifications}
+                className="text-rose-600 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all px-3 py-1.5 rounded-lg hover:bg-rose-50"
+              >
+                全部
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {notifications.slice(0, 3).map((notification) => {
+              const { icon: Icon, color, bgColor } = getNotificationIcon(notification.type);
+              return (
+                <div
+                  key={notification.id}
+                  onClick={() => handleNotificationClick(notification.id)}
+                  className={cn(
+                    'flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors',
+                    notification.read ? 'bg-white' : 'bg-rose-50/50'
+                  )}
+                >
+                  <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', bgColor)}>
+                    <Icon className={cn('w-5 h-5', color)} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className={cn(
+                        'text-sm font-medium truncate',
+                        notification.read ? 'text-slate-600' : 'text-slate-800'
+                      )}>
+                        {notification.title}
+                      </p>
+                      {!notification.read && (
+                        <span className="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0 mt-1.5" />
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                      {notification.content}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1.5">
+                      {formatNotificationTime(notification.timestamp)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       )}

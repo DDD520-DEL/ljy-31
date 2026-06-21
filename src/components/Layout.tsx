@@ -1,6 +1,18 @@
+import { useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { Home, Plus, Clock, History, BarChart3 } from 'lucide-react';
+import { Home, Plus, Clock, History, BarChart3, Bell } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { NotificationPanel } from './NotificationPanel';
+import { NotificationToast } from './NotificationToast';
+import {
+  useInitWebSocket,
+  useDisconnectWebSocket,
+  useUnreadCount,
+  useSetShowNotificationPanel,
+  useShowNotificationPanel,
+} from '../store/useNotificationStore';
+import { useSettings } from '../store/useAppStore';
+import { websocketService } from '../services/websocket';
 
 const navItems = [
   { to: '/', label: '首页', icon: Home },
@@ -13,9 +25,45 @@ const navItems = [
 export default function Layout() {
   const location = useLocation();
   const isRecordPage = location.pathname === '/record';
+  const initWebSocket = useInitWebSocket();
+  const disconnectWebSocket = useDisconnectWebSocket();
+  const unreadCount = useUnreadCount();
+  const setShowPanel = useSetShowNotificationPanel();
+  const showPanel = useShowNotificationPanel();
+  const settings = useSettings();
+
+  useEffect(() => {
+    initWebSocket();
+
+    return () => {
+      disconnectWebSocket();
+    };
+  }, [initWebSocket, disconnectWebSocket]);
+
+  useEffect(() => {
+    websocketService.setFavoriteRoads(settings.favoriteRoads);
+  }, [settings.favoriteRoads]);
+
+  const handleBellClick = () => {
+    setShowPanel(!showPanel);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white">
+      <div className="fixed top-4 right-4 z-40">
+        <button
+          onClick={handleBellClick}
+          className="relative w-10 h-10 rounded-full bg-white shadow-md border border-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors"
+        >
+          <Bell className="w-5 h-5" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-xs font-bold flex items-center justify-center">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </button>
+      </div>
+
       <main className="pb-24 max-w-2xl mx-auto">
         <Outlet />
       </main>
@@ -69,6 +117,9 @@ export default function Layout() {
           </div>
         </div>
       </nav>
+
+      <NotificationPanel />
+      <NotificationToast />
     </div>
   );
 }

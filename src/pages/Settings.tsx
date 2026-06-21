@@ -15,6 +15,14 @@ import {
   CloudRain,
   FileText,
   Calendar,
+  Wifi,
+  WifiOff,
+  Volume2,
+  Vibrate,
+  Moon,
+  BellRing,
+  MapPin,
+  BarChart3,
 } from 'lucide-react';
 import {
   useSettings,
@@ -27,6 +35,18 @@ import {
   useGenerateWeeklyReport,
   useIsGeneratingReport,
 } from '../store/useAppStore';
+import {
+  usePushSettings,
+  useWsStatus,
+  useUpdatePushSettings,
+  useUpdateQuietHours,
+  useToggleDoNotDisturb,
+  useMarkAllAsRead,
+  useClearNotifications,
+  useNotifications,
+  useUnreadCount,
+} from '../store/useNotificationStore';
+import { websocketService } from '../services/websocket';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import { Button } from '../components/Button';
 import { cn } from '../lib/utils';
@@ -66,6 +86,61 @@ export default function SettingsPage() {
   const generateWeeklyReport = useGenerateWeeklyReport();
   const isGeneratingReport = useIsGeneratingReport();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const pushSettings = usePushSettings();
+  const wsStatus = useWsStatus();
+  const updatePushSettings = useUpdatePushSettings();
+  const updateQuietHours = useUpdateQuietHours();
+  const toggleDoNotDisturb = useToggleDoNotDisturb();
+  const markAllAsRead = useMarkAllAsRead();
+  const clearNotifications = useClearNotifications();
+  const notifications = useNotifications();
+  const unreadCount = useUnreadCount();
+
+  const handlePushToggle = () => {
+    updatePushSettings({ enabled: !pushSettings.enabled });
+  };
+
+  const handleRoadReminderToggle = () => {
+    updatePushSettings({ roadReminderEnabled: !pushSettings.roadReminderEnabled });
+  };
+
+  const handleWeatherAlertToggle = () => {
+    updatePushSettings({ weatherAlertEnabled: !pushSettings.weatherAlertEnabled });
+  };
+
+  const handleWeeklyReportPushToggle = () => {
+    updatePushSettings({ weeklyReportEnabled: !pushSettings.weeklyReportEnabled });
+  };
+
+  const handleSoundToggle = () => {
+    updatePushSettings({ sound: !pushSettings.sound });
+  };
+
+  const handleVibrateToggle = () => {
+    updatePushSettings({ vibrate: !pushSettings.vibrate });
+  };
+
+  const handleQuietHoursToggle = () => {
+    updateQuietHours({ enabled: !pushSettings.quietHours.enabled });
+  };
+
+  const handleQuietHoursStartChange = (hour: number, minute: number) => {
+    updateQuietHours({ startHour: hour, startMinute: minute });
+  };
+
+  const handleQuietHoursEndChange = (hour: number, minute: number) => {
+    updateQuietHours({ endHour: hour, endMinute: minute });
+  };
+
+  const handleTestNotification = () => {
+    websocketService.simulateNotification(
+      'road_reminder',
+      '测试推送通知',
+      '这是一条测试通知，用于验证推送功能是否正常工作。',
+      { test: true }
+    );
+  };
 
   const handleReminderToggle = () => {
     updateSettings({ reminderEnabled: !settings.reminderEnabled });
@@ -247,6 +322,320 @@ export default function SettingsPage() {
                   </ul>
                 </div>
               </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BellRing className="w-5 h-5 text-rose-500" />
+            推送设置
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="font-medium text-slate-800">开启推送</p>
+                {wsStatus.connected ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                    <Wifi className="w-3 h-3" />
+                    已连接
+                  </span>
+                ) : wsStatus.connecting ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    连接中
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
+                    <WifiOff className="w-3 h-3" />
+                    未连接
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-slate-500 mt-0.5">
+                实时接收洒水车出没提醒和通知
+              </p>
+            </div>
+            <button
+              onClick={handlePushToggle}
+              className={toggleSwitchClass(pushSettings.enabled)}
+              aria-pressed={pushSettings.enabled}
+            >
+              <span
+                aria-hidden="true"
+                className={toggleDotClass(pushSettings.enabled)}
+              />
+            </button>
+          </div>
+
+          <div className={cn(!pushSettings.enabled && 'opacity-50 pointer-events-none')}>
+            <p className="text-sm font-medium text-slate-700 mb-3">通知类型</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-sky-100 flex items-center justify-center">
+                    <MapPin className="w-4 h-4 text-sky-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">路段提醒</p>
+                    <p className="text-xs text-slate-500">收藏路段预测时间提醒</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleRoadReminderToggle}
+                  className={toggleSwitchClass(pushSettings.roadReminderEnabled)}
+                  aria-pressed={pushSettings.roadReminderEnabled}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={toggleDotClass(pushSettings.roadReminderEnabled)}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                    <CloudRain className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">天气预警</p>
+                    <p className="text-xs text-slate-500">天气变化影响洒水概率时提醒</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleWeatherAlertToggle}
+                  className={toggleSwitchClass(pushSettings.weatherAlertEnabled)}
+                  aria-pressed={pushSettings.weatherAlertEnabled}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={toggleDotClass(pushSettings.weatherAlertEnabled)}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                    <BarChart3 className="w-4 h-4 text-indigo-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">周报推送</p>
+                    <p className="text-xs text-slate-500">每周报告生成后推送通知</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleWeeklyReportPushToggle}
+                  className={toggleSwitchClass(pushSettings.weeklyReportEnabled)}
+                  aria-pressed={pushSettings.weeklyReportEnabled}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={toggleDotClass(pushSettings.weeklyReportEnabled)}
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className={cn(!pushSettings.enabled && 'opacity-50 pointer-events-none')}>
+            <p className="text-sm font-medium text-slate-700 mb-3">提醒方式</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                    <Volume2 className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">声音提醒</p>
+                    <p className="text-xs text-slate-500">收到通知时播放提示音</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleSoundToggle}
+                  className={toggleSwitchClass(pushSettings.sound)}
+                  aria-pressed={pushSettings.sound}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={toggleDotClass(pushSettings.sound)}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                    <Vibrate className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">震动提醒</p>
+                    <p className="text-xs text-slate-500">收到通知时设备震动</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleVibrateToggle}
+                  className={toggleSwitchClass(pushSettings.vibrate)}
+                  aria-pressed={pushSettings.vibrate}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={toggleDotClass(pushSettings.vibrate)}
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className={cn(!pushSettings.enabled && 'opacity-50 pointer-events-none')}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Moon className="w-5 h-5 text-indigo-500" />
+                <p className="font-medium text-slate-700">免打扰模式</p>
+              </div>
+              <button
+                onClick={toggleDoNotDisturb}
+                className={toggleSwitchClass(pushSettings.doNotDisturb)}
+                aria-pressed={pushSettings.doNotDisturb}
+              >
+                <span
+                  aria-hidden="true"
+                  className={toggleDotClass(pushSettings.doNotDisturb)}
+                />
+              </button>
+            </div>
+            <p className="text-xs text-slate-400">
+              开启后所有推送通知将被静默，不响铃不震动
+            </p>
+          </div>
+
+          <div className={cn(!pushSettings.enabled && 'opacity-50 pointer-events-none')}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-teal-500" />
+                <p className="font-medium text-slate-700">静音时段</p>
+              </div>
+              <button
+                onClick={handleQuietHoursToggle}
+                className={toggleSwitchClass(pushSettings.quietHours.enabled)}
+                aria-pressed={pushSettings.quietHours.enabled}
+              >
+                <span
+                  aria-hidden="true"
+                  className={toggleDotClass(pushSettings.quietHours.enabled)}
+                />
+              </button>
+            </div>
+
+            <div className={cn(!pushSettings.quietHours.enabled && 'opacity-50 pointer-events-none')}>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-500 mb-2">开始时间</p>
+                  <div className="flex items-center gap-1">
+                    <select
+                      value={pushSettings.quietHours.startHour}
+                      onChange={(e) => handleQuietHoursStartChange(Number(e.target.value), pushSettings.quietHours.startMinute)}
+                      className="flex-1 px-3 py-2 rounded-xl bg-slate-100 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    >
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <option key={i} value={i}>
+                          {String(i).padStart(2, '0')}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-slate-400 font-medium">:</span>
+                    <select
+                      value={pushSettings.quietHours.startMinute}
+                      onChange={(e) => handleQuietHoursStartChange(pushSettings.quietHours.startHour, Number(e.target.value))}
+                      className="flex-1 px-3 py-2 rounded-xl bg-slate-100 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    >
+                      {[0, 15, 30, 45].map((m) => (
+                        <option key={m} value={m}>
+                          {String(m).padStart(2, '0')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 mb-2">结束时间</p>
+                  <div className="flex items-center gap-1">
+                    <select
+                      value={pushSettings.quietHours.endHour}
+                      onChange={(e) => handleQuietHoursEndChange(Number(e.target.value), pushSettings.quietHours.endMinute)}
+                      className="flex-1 px-3 py-2 rounded-xl bg-slate-100 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    >
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <option key={i} value={i}>
+                          {String(i).padStart(2, '0')}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-slate-400 font-medium">:</span>
+                    <select
+                      value={pushSettings.quietHours.endMinute}
+                      onChange={(e) => handleQuietHoursEndChange(pushSettings.quietHours.endHour, Number(e.target.value))}
+                      className="flex-1 px-3 py-2 rounded-xl bg-slate-100 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    >
+                      {[0, 15, 30, 45].map((m) => (
+                        <option key={m} value={m}>
+                          {String(m).padStart(2, '0')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-slate-400 mt-3">
+                在设定的时段内，推送通知将被静音
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-slate-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-slate-800">通知管理</p>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  共 {notifications.length} 条通知，{unreadCount} 条未读
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTestNotification}
+                className="flex-1"
+                disabled={!pushSettings.enabled}
+              >
+                <Bell className="w-4 h-4" />
+                测试推送
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={markAllAsRead}
+                className="flex-1"
+                disabled={unreadCount === 0}
+              >
+                全部已读
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearNotifications}
+                className="flex-1 text-red-500 hover:bg-red-50"
+                disabled={notifications.length === 0}
+              >
+                <Trash2 className="w-4 h-4" />
+                清空
+              </Button>
             </div>
           </div>
         </CardContent>

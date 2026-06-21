@@ -130,12 +130,56 @@ export interface AppSettings {
   weeklyReport: WeeklyReportSettings;
 }
 
+export type NotificationType = 'road_reminder' | 'weather_alert' | 'weekly_report' | 'system';
+
+export interface NotificationMessage {
+  id: string;
+  type: NotificationType;
+  title: string;
+  content: string;
+  roadName?: string;
+  predictedTime?: string;
+  probability?: number;
+  timestamp: number;
+  read: boolean;
+  data?: Record<string, unknown>;
+}
+
+export interface QuietHours {
+  enabled: boolean;
+  startHour: number;
+  startMinute: number;
+  endHour: number;
+  endMinute: number;
+}
+
+export interface PushSettings {
+  enabled: boolean;
+  roadReminderEnabled: boolean;
+  weatherAlertEnabled: boolean;
+  weeklyReportEnabled: boolean;
+  quietHours: QuietHours;
+  doNotDisturb: boolean;
+  vibrate: boolean;
+  sound: boolean;
+}
+
+export interface WebSocketStatus {
+  connected: boolean;
+  connecting: boolean;
+  lastConnectTime: number | null;
+  lastDisconnectTime: number | null;
+  reconnectAttempts: number;
+}
+
 export enum StorageKeys {
   RECORDS = 'sprinkler_records',
   PREDICTIONS = 'sprinkler_predictions',
   SETTINGS = 'sprinkler_settings',
   WEATHER = 'sprinkler_weather',
   WEEKLY_REPORTS = 'sprinkler_weekly_reports',
+  NOTIFICATIONS = 'sprinkler_notifications',
+  PUSH_SETTINGS = 'sprinkler_push_settings',
 }
 
 export interface ImportReportItem {
