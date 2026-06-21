@@ -1,6 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Search, MapPin, Droplets, Clock, Filter, CloudRain, Star, Info } from 'lucide-react';
 import { usePredictions, useWeather, useGetWeatherAdjustment, useRefreshWeather, useIsWeatherLoading, useSettings } from '../store/useAppStore';
+import { useExpandRoad, useClearNavigationParams } from '../store/useSearchStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import PredictionCard from '../components/PredictionCard';
 import TimeAxis from '../components/TimeAxis';
@@ -17,6 +19,9 @@ export default function Schedule() {
   const refreshWeather = useRefreshWeather();
   const isWeatherLoading = useIsWeatherLoading();
   const settings = useSettings();
+  const expandRoadFromSearch = useExpandRoad();
+  const clearNavigationParams = useClearNavigationParams();
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [sortType, setSortType] = useState<SortType>('recordCount');
   const [expandedRoad, setExpandedRoad] = useState<string | null>(null);
@@ -26,6 +31,22 @@ export default function Schedule() {
     message: '',
     isFavorite: false,
   });
+  const roadRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    if (expandRoadFromSearch) {
+      setSearchQuery('');
+      setExpandedRoad(expandRoadFromSearch);
+      setSortType('roadName');
+      setTimeout(() => {
+        const el = roadRefs.current[expandRoadFromSearch];
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        clearNavigationParams();
+      }, 100);
+    }
+  }, [expandRoadFromSearch, clearNavigationParams, location.pathname]);
 
   const filteredPredictions = useMemo(() => {
     let result = [...predictions];
@@ -200,15 +221,28 @@ export default function Schedule() {
       {filteredPredictions.length > 0 ? (
         <div className="space-y-4">
           {filteredPredictions.map((prediction) => (
-            <div key={prediction.roadName} className="space-y-3">
-              <PredictionCard
-                prediction={prediction}
-                enableLongPress={true}
-                onLongPress={() => handleLongPress(prediction.roadName)}
-                onClick={() =>
-                  setExpandedRoad(expandedRoad === prediction.roadName ? null : prediction.roadName)
-                }
-              />
+            <div
+              key={prediction.roadName}
+              className="space-y-3"
+              ref={(el) => (roadRefs.current[prediction.roadName] = el)}
+            >
+              <div
+                className={cn(
+                  'transition-all duration-500 rounded-2xl',
+                  expandedRoad === prediction.roadName &&
+                    expandRoadFromSearch === prediction.roadName &&
+                    'ring-2 ring-sky-400 ring-offset-2 ring-offset-sky-50 animate-pulse'
+                )}
+              >
+                <PredictionCard
+                  prediction={prediction}
+                  enableLongPress={true}
+                  onLongPress={() => handleLongPress(prediction.roadName)}
+                  onClick={() =>
+                    setExpandedRoad(expandedRoad === prediction.roadName ? null : prediction.roadName)
+                  }
+                />
+              </div>
 
               {expandedRoad === prediction.roadName && (
                 <Card className="border-2 border-sky-100 bg-sky-50/30">

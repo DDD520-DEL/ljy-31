@@ -4,6 +4,7 @@ import { Home, Plus, Clock, History, BarChart3, Bell } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { NotificationPanel } from './NotificationPanel';
 import { NotificationToast } from './NotificationToast';
+import GlobalSearch from './GlobalSearch';
 import {
   useInitWebSocket,
   useDisconnectWebSocket,
@@ -64,9 +65,11 @@ export default function Layout() {
         </button>
       </div>
 
-      <main className="pb-24 max-w-2xl mx-auto">
+      <main className="pb-40 max-w-2xl mx-auto">
         <Outlet />
       </main>
+
+      <GlobalSearch />
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-slate-200 z-50">
         <div className="max-w-2xl mx-auto px-4">

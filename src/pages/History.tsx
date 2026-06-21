@@ -1,5 +1,5 @@
-import { useState, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Search,
   Download,
@@ -24,6 +24,7 @@ import {
   useImportRecordsFromCSV,
   useSettings,
 } from '../store/useAppStore';
+import { useHighlightRecordId, useClearNavigationParams } from '../store/useSearchStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import { Button } from '../components/Button';
 import RecordCard from '../components/RecordCard';
@@ -38,12 +39,15 @@ type ExportFormat = 'json' | 'csv';
 
 export default function History() {
   const navigate = useNavigate();
+  const location = useLocation();
   const records = useRecords();
   const deleteRecord = useDeleteRecord();
   const exportData = useExportData();
   const exportRecordsCSV = useExportRecordsCSV();
   const importRecordsFromCSV = useImportRecordsFromCSV();
   const settings = useSettings();
+  const highlightRecordId = useHighlightRecordId();
+  const clearNavigationParams = useClearNavigationParams();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('all');
@@ -58,8 +62,35 @@ export default function History() {
   const [exportDateEnd, setExportDateEnd] = useState('');
   const [importReport, setImportReport] = useState<ImportReportType | null>(null);
   const [showImportReport, setShowImportReport] = useState(false);
+  const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recordRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    if (highlightRecordId) {
+      const record = records.find((r) => r.id === highlightRecordId);
+      if (record) {
+        setDateStart('');
+        setDateEnd('');
+        setFilterType('all');
+        setSearchQuery('');
+        setActiveHighlightId(highlightRecordId);
+        setTimeout(() => {
+          const el = recordRefs.current[highlightRecordId];
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          clearNavigationParams();
+        }, 150);
+        setTimeout(() => {
+          setActiveHighlightId(null);
+        }, 3000);
+      } else {
+        clearNavigationParams();
+      }
+    }
+  }, [highlightRecordId, records, clearNavigationParams, location.pathname]);
 
   const favoriteRoads = settings.favoriteRoads;
 
@@ -497,12 +528,24 @@ export default function History() {
               </div>
               <div className="space-y-3">
                 {groupedRecords[date].map((record) => (
-                  <div key={record.id} className="relative">
-                    <RecordCard
-                      record={record}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                    />
+                  <div
+                    key={record.id}
+                    className="relative"
+                    ref={(el) => (recordRefs.current[record.id] = el)}
+                  >
+                    <div
+                      className={cn(
+                        'transition-all duration-500 rounded-2xl',
+                        activeHighlightId === record.id &&
+                          'ring-4 ring-emerald-400 ring-offset-2 ring-offset-emerald-50 shadow-lg shadow-emerald-200/50 animate-pulse'
+                      )}
+                    >
+                      <RecordCard
+                        record={record}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                      />
+                    </div>
                     {deleteConfirm === record.id && (
                       <div className="absolute inset-0 bg-red-50/95 backdrop-blur-sm rounded-2xl flex items-center justify-center z-20 border-2 border-red-200">
                         <div className="text-center">

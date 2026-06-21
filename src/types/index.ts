@@ -180,6 +180,28 @@ export enum StorageKeys {
   WEEKLY_REPORTS = 'sprinkler_weekly_reports',
   NOTIFICATIONS = 'sprinkler_notifications',
   PUSH_SETTINGS = 'sprinkler_push_settings',
+  SEARCH_HISTORY = 'sprinkler_search_history',
+}
+
+export type SearchResultType = 'road' | 'record' | 'statistic';
+
+export interface SearchResultItem {
+  type: SearchResultType;
+  id: string;
+  title: string;
+  subtitle?: string;
+  matchField?: string;
+  matchText?: string;
+  target: {
+    roadName?: string;
+    recordId?: string;
+    statisticSection?: 'overview' | 'hourly' | 'monthly' | 'heatmap' | 'topRoads' | 'splashRate';
+  };
+}
+
+export interface SearchHistoryItem {
+  keyword: string;
+  timestamp: number;
 }
 
 export interface ImportReportItem {

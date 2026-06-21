@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   BarChart,
   Bar,
@@ -38,6 +39,7 @@ import {
   useExportRecordsCSV,
   useSettings,
 } from '../store/useAppStore';
+import { useScrollToSection, useClearNavigationParams } from '../store/useSearchStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import Heatmap from '../components/Heatmap';
 import WeeklyReportCard from '../components/WeeklyReportCard';
@@ -60,6 +62,9 @@ export default function Statistics() {
   const isGeneratingReport = useIsGeneratingReport();
   const exportRecordsCSV = useExportRecordsCSV();
   const settings = useSettings();
+  const scrollToSection = useScrollToSection();
+  const clearNavigationParams = useClearNavigationParams();
+  const location = useLocation();
 
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
@@ -68,8 +73,26 @@ export default function Statistics() {
   const [pendingExportTarget, setPendingExportTarget] = useState<'records' | 'stats' | null>(null);
   const [statsScope, setStatsScope] = useState<StatsScope>('all');
   const [showComparison, setShowComparison] = useState(false);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
 
   const favoriteRoads = settings.favoriteRoads;
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    if (scrollToSection) {
+      setActiveSection(scrollToSection);
+      setTimeout(() => {
+        const el = sectionRefs.current[scrollToSection];
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        clearNavigationParams();
+      }, 150);
+      setTimeout(() => {
+        setActiveSection(null);
+      }, 3000);
+    }
+  }, [scrollToSection, clearNavigationParams, location.pathname]);
 
   const records = useMemo(() => {
     let result = allRecords;
@@ -620,8 +643,18 @@ export default function Statistics() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Card gradient className="bg-gradient-to-br from-sky-500 to-blue-600">
+      <div
+        className="grid grid-cols-2 gap-3"
+        ref={(el) => (sectionRefs.current['overview'] = el)}
+      >
+        <Card
+          gradient
+          className={cn(
+            'bg-gradient-to-br from-sky-500 to-blue-600 transition-all duration-500',
+            activeSection === 'overview' &&
+              'ring-4 ring-purple-400 ring-offset-2 ring-offset-purple-50 shadow-lg shadow-purple-200/50 animate-pulse'
+          )}
+        >
           <CardContent className="py-5">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -680,7 +713,14 @@ export default function Statistics() {
         </Card>
       </div>
 
-      <Card>
+      <Card
+        ref={(el) => (sectionRefs.current['hourly'] = el)}
+        className={cn(
+          'transition-all duration-500',
+          activeSection === 'hourly' &&
+            'ring-4 ring-purple-400 ring-offset-2 ring-offset-purple-50 shadow-lg shadow-purple-200/50 animate-pulse'
+        )}
+      >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-sky-500" />
@@ -723,7 +763,14 @@ export default function Statistics() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card
+        ref={(el) => (sectionRefs.current['monthly'] = el)}
+        className={cn(
+          'transition-all duration-500',
+          activeSection === 'monthly' &&
+            'ring-4 ring-purple-400 ring-offset-2 ring-offset-purple-50 shadow-lg shadow-purple-200/50 animate-pulse'
+        )}
+      >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-sky-500" />
@@ -778,7 +825,14 @@ export default function Statistics() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card
+        ref={(el) => (sectionRefs.current['heatmap'] = el)}
+        className={cn(
+          'transition-all duration-500',
+          activeSection === 'heatmap' &&
+            'ring-4 ring-purple-400 ring-offset-2 ring-offset-purple-50 shadow-lg shadow-purple-200/50 animate-pulse'
+        )}
+      >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MapPin className="w-5 h-5 text-sky-500" />
@@ -791,7 +845,14 @@ export default function Statistics() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card
+        ref={(el) => (sectionRefs.current['topRoads'] = el)}
+        className={cn(
+          'transition-all duration-500',
+          activeSection === 'topRoads' &&
+            'ring-4 ring-purple-400 ring-offset-2 ring-offset-purple-50 shadow-lg shadow-purple-200/50 animate-pulse'
+        )}
+      >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-sky-500" />
@@ -844,7 +905,14 @@ export default function Statistics() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card
+        ref={(el) => (sectionRefs.current['splashRate'] = el)}
+        className={cn(
+          'transition-all duration-500',
+          activeSection === 'splashRate' &&
+            'ring-4 ring-purple-400 ring-offset-2 ring-offset-purple-50 shadow-lg shadow-purple-200/50 animate-pulse'
+        )}
+      >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-sky-500" />
