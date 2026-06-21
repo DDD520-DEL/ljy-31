@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { getProbabilityColor, getProbabilityBgLight, getConfidenceLabel, getConfidenceColor } from '../utils/format';
 import { RoadPrediction } from '../types';
 import { useIsFavoriteRoad, useToggleFavoriteRoad, useWeather } from '../store/useAppStore';
@@ -11,6 +11,8 @@ interface PredictionCardProps {
   onClick?: () => void;
   highlight?: boolean;
   showFavorite?: boolean;
+  enableLongPress?: boolean;
+  onLongPress?: () => void;
 }
 
 export default function PredictionCard({
@@ -18,13 +20,17 @@ export default function PredictionCard({
   onClick,
   highlight = false,
   showFavorite = true,
+  enableLongPress = false,
+  onLongPress,
 }: PredictionCardProps) {
   const weather = useWeather();
   const weatherAdjustment = useRoadWeatherAdjustment(prediction.splashProbability);
-  const splashPercent = Math.round(prediction.splashProbability * 100);
   const isFavorite = useIsFavoriteRoad(prediction.roadName);
   const toggleFavorite = useToggleFavoriteRoad();
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isLongPressing, setIsLongPressing] = useState(false);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLongPressTriggeredRef = useRef(false);
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -33,12 +39,61 @@ export default function PredictionCard({
     setTimeout(() => setIsAnimating(false), 300);
   };
 
+  const handlePointerDown = () => {
+    if (!enableLongPress) return;
+    isLongPressTriggeredRef.current = false;
+    setIsLongPressing(true);
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressTriggeredRef.current = true;
+      setIsAnimating(true);
+      toggleFavorite(prediction.roadName);
+      setTimeout(() => setIsAnimating(false), 300);
+      if (onLongPress) onLongPress();
+      if (navigator.vibrate) navigator.vibrate(50);
+    }, 500);
+  };
+
+  const handlePointerUp = () => {
+    if (!enableLongPress) return;
+    setIsLongPressing(false);
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handlePointerLeave = () => {
+    if (!enableLongPress) return;
+    setIsLongPressing(false);
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isLongPressTriggeredRef.current) {
+      e.preventDefault();
+      isLongPressTriggeredRef.current = false;
+      return;
+    }
+    onClick?.();
+  };
+
   return (
     <div
-      onClick={onClick}
+      onClick={handleClick}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerLeave}
+      onPointerCancel={handlePointerUp}
+      onContextMenu={(e) => {
+        if (enableLongPress) e.preventDefault();
+      }}
       className={cn(
-        'bg-white rounded-2xl p-5 shadow-sm border border-slate-100 cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 relative',
-        highlight && 'ring-2 ring-sky-500 ring-offset-2'
+        'bg-white rounded-2xl p-5 shadow-sm border border-slate-100 cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 relative select-none',
+        highlight && 'ring-2 ring-sky-500 ring-offset-2',
+        isLongPressing && 'scale-95 ring-2 ring-amber-400 ring-offset-2'
       )}
     >
       <div className="flex items-start justify-between mb-4">

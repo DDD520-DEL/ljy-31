@@ -14,6 +14,7 @@ import {
   ChevronDown,
   FileSpreadsheet,
   Info,
+  Star,
 } from 'lucide-react';
 import {
   useRecords,
@@ -21,6 +22,7 @@ import {
   useExportData,
   useExportRecordsCSV,
   useImportRecordsFromCSV,
+  useSettings,
 } from '../store/useAppStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import { Button } from '../components/Button';
@@ -31,7 +33,7 @@ import { downloadCSV } from '../utils/csv';
 import { cn } from '../lib/utils';
 import { ExportScope, ImportReport as ImportReportType } from '../types';
 
-type FilterType = 'all' | 'splashed' | 'notSplashed';
+type FilterType = 'all' | 'splashed' | 'notSplashed' | 'favorites';
 type ExportFormat = 'json' | 'csv';
 
 export default function History() {
@@ -41,6 +43,7 @@ export default function History() {
   const exportData = useExportData();
   const exportRecordsCSV = useExportRecordsCSV();
   const importRecordsFromCSV = useImportRecordsFromCSV();
+  const settings = useSettings();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('all');
@@ -58,6 +61,8 @@ export default function History() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const favoriteRoads = settings.favoriteRoads;
+
   const filteredRecords = useMemo(() => {
     let result = [...records];
 
@@ -74,6 +79,8 @@ export default function History() {
       result = result.filter((r) => r.isSplashed);
     } else if (filterType === 'notSplashed') {
       result = result.filter((r) => !r.isSplashed);
+    } else if (filterType === 'favorites') {
+      result = result.filter((r) => favoriteRoads.includes(r.road));
     }
 
     if (dateStart) {
@@ -84,7 +91,7 @@ export default function History() {
     }
 
     return result.sort((a, b) => b.timestamp - a.timestamp);
-  }, [records, searchQuery, filterType, dateStart, dateEnd]);
+  }, [records, searchQuery, filterType, dateStart, dateEnd, favoriteRoads]);
 
   const groupedRecords = useMemo(() => {
     return groupRecordsByDate(filteredRecords);
@@ -229,11 +236,16 @@ export default function History() {
 
   const filterOptions: Array<{ value: FilterType; label: string }> = [
     { value: 'all', label: '全部记录' },
+    { value: 'favorites', label: '仅收藏路段' },
     { value: 'splashed', label: '仅被溅到' },
     { value: 'notSplashed', label: '仅未溅到' },
   ];
 
   const hasActiveFilters = searchQuery.trim() || filterType !== 'all' || dateStart || dateEnd;
+
+  const favoriteRecordsCount = useMemo(() => {
+    return records.filter((r) => favoriteRoads.includes(r.road)).length;
+  }, [records, favoriteRoads]);
 
   const stats = useMemo(() => {
     const total = records.length;
@@ -295,12 +307,31 @@ export default function History() {
               className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none transition-all text-slate-800 placeholder-slate-400"
             />
           </div>
+          <button
+            onClick={() => setFilterType(filterType === 'favorites' ? 'all' : 'favorites')}
+            disabled={favoriteRoads.length === 0}
+            className={cn(
+              'flex items-center gap-2 px-4 py-3 rounded-xl border transition-colors',
+              filterType === 'favorites'
+                ? 'border-amber-400 bg-amber-50 text-amber-700'
+                : favoriteRoads.length === 0
+                ? 'border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed'
+                : 'border-slate-200 bg-white hover:bg-amber-50/50 text-slate-600'
+            )}
+            title={favoriteRoads.length === 0 ? '暂无收藏路段' : '筛选收藏路段'}
+          >
+            <Star className={cn('w-5 h-5', filterType === 'favorites' && 'fill-amber-500')} />
+            <span className="text-sm font-medium hidden sm:inline">收藏</span>
+            <span className="text-xs bg-white/80 px-1.5 py-0.5 rounded-md font-medium">
+              {favoriteRecordsCount}
+            </span>
+          </button>
           <div className="relative">
             <button
               onClick={() => setShowFilterMenu(!showFilterMenu)}
               className={cn(
                 'flex items-center gap-2 px-4 py-3 rounded-xl border transition-colors',
-                filterType !== 'all'
+                filterType !== 'all' && filterType !== 'favorites'
                   ? 'border-sky-500 bg-sky-50 text-sky-700'
                   : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
               )}
@@ -308,7 +339,7 @@ export default function History() {
               <Filter className="w-5 h-5" />
             </button>
             {showFilterMenu && (
-              <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden z-10 min-w-[140px]">
+              <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden z-10 min-w-[160px]">
                 {filterOptions.map((option) => (
                   <button
                     key={option.value}
@@ -317,13 +348,23 @@ export default function History() {
                       setShowFilterMenu(false);
                     }}
                     className={cn(
-                      'w-full px-4 py-3 text-left text-sm transition-colors border-b border-slate-50 last:border-b-0',
+                      'w-full px-4 py-3 text-left text-sm transition-colors border-b border-slate-50 last:border-b-0 flex items-center gap-2',
                       filterType === option.value
-                        ? 'bg-sky-50 text-sky-700 font-medium'
+                        ? option.value === 'favorites'
+                          ? 'bg-amber-50 text-amber-700 font-medium'
+                          : 'bg-sky-50 text-sky-700 font-medium'
                         : 'text-slate-600 hover:bg-slate-50'
                     )}
                   >
+                    {option.value === 'favorites' && (
+                      <Star className={cn('w-4 h-4', filterType === option.value && 'fill-amber-500')} />
+                    )}
                     {option.label}
+                    {option.value === 'favorites' && (
+                      <span className="ml-auto text-xs text-slate-400">
+                        {favoriteRecordsCount}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>

@@ -24,6 +24,8 @@ import {
   X,
   Info,
   Table as TableIcon,
+  Star,
+  Layers,
 } from 'lucide-react';
 import {
   useStatistics,
@@ -34,6 +36,7 @@ import {
   useGenerateWeeklyReport,
   useIsGeneratingReport,
   useExportRecordsCSV,
+  useSettings,
 } from '../store/useAppStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import Heatmap from '../components/Heatmap';
@@ -45,6 +48,8 @@ import { generateStatistics } from '../utils/analysis';
 import { ExportScope } from '../types';
 import { Button } from '../components/Button';
 
+type StatsScope = 'all' | 'favorites';
+
 export default function Statistics() {
   const statistics = useStatistics();
   const predictions = usePredictions();
@@ -54,14 +59,44 @@ export default function Statistics() {
   const generateWeeklyReport = useGenerateWeeklyReport();
   const isGeneratingReport = useIsGeneratingReport();
   const exportRecordsCSV = useExportRecordsCSV();
+  const settings = useSettings();
 
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
   const [pendingExportTarget, setPendingExportTarget] = useState<'records' | 'stats' | null>(null);
+  const [statsScope, setStatsScope] = useState<StatsScope>('all');
+  const [showComparison, setShowComparison] = useState(false);
+
+  const favoriteRoads = settings.favoriteRoads;
 
   const records = useMemo(() => {
+    let result = allRecords;
+    if (statsScope === 'favorites') {
+      result = result.filter((r) => favoriteRoads.includes(r.road));
+    }
+    if (dateStart) {
+      result = result.filter((r) => r.date >= dateStart);
+    }
+    if (dateEnd) {
+      result = result.filter((r) => r.date <= dateEnd);
+    }
+    return result;
+  }, [allRecords, dateStart, dateEnd, statsScope, favoriteRoads]);
+
+  const favoriteRecords = useMemo(() => {
+    let result = allRecords.filter((r) => favoriteRoads.includes(r.road));
+    if (dateStart) {
+      result = result.filter((r) => r.date >= dateStart);
+    }
+    if (dateEnd) {
+      result = result.filter((r) => r.date <= dateEnd);
+    }
+    return result;
+  }, [allRecords, dateStart, dateEnd, favoriteRoads]);
+
+  const allScopedRecords = useMemo(() => {
     let result = allRecords;
     if (dateStart) {
       result = result.filter((r) => r.date >= dateStart);
@@ -71,6 +106,26 @@ export default function Statistics() {
     }
     return result;
   }, [allRecords, dateStart, dateEnd]);
+
+  const favoriteStats = useMemo(() => {
+    if (favoriteRecords.length === 0) return null;
+    const stats = generateStatistics(favoriteRecords);
+    return {
+      totalRecords: stats.totalRecords,
+      totalSplashed: stats.totalSplashed,
+      splashRate: stats.splashRate,
+    };
+  }, [favoriteRecords]);
+
+  const allStats = useMemo(() => {
+    if (allScopedRecords.length === 0) return null;
+    const stats = generateStatistics(allScopedRecords);
+    return {
+      totalRecords: stats.totalRecords,
+      totalSplashed: stats.totalSplashed,
+      splashRate: stats.splashRate,
+    };
+  }, [allScopedRecords]);
 
   const filteredStatistics = useMemo(() => {
     if (!dateStart && !dateEnd) return statistics;
@@ -231,7 +286,20 @@ export default function Statistics() {
           <h1 className="text-2xl font-bold text-slate-800 mb-1">统计分析</h1>
           <p className="text-slate-500 text-sm">洒水车出没规律深度分析</p>
         </div>
-        <div className="relative">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowComparison(!showComparison)}
+            className={cn(
+              'flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-colors',
+              showComparison
+                ? 'border-amber-400 bg-amber-50 text-amber-700'
+                : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
+            )}
+          >
+            <Layers className="w-4 h-4" />
+            <span className="text-sm font-medium">对比</span>
+          </button>
+          <div className="relative">
           <button
             onClick={() => setShowExportMenu(!showExportMenu)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors text-slate-600"
@@ -320,10 +388,11 @@ export default function Statistics() {
             </div>
           )}
         </div>
+        </div>
       </div>
 
       <Card className="bg-sky-50/50 border-sky-100">
-        <CardContent className="py-3">
+        <CardContent className="py-3 space-y-3">
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2 text-sm">
               <Calendar className="w-4 h-4 text-sky-500" />
@@ -366,8 +435,139 @@ export default function Statistics() {
               )}
             </div>
           </div>
+
+          <div className="border-t border-sky-100 pt-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 text-sm">
+                <Star className="w-4 h-4 text-amber-500" />
+                <span className="font-medium text-slate-700">路段范围:</span>
+              </div>
+              <div className="flex bg-white rounded-xl p-1 shadow-sm border border-slate-200">
+                <button
+                  onClick={() => setStatsScope('all')}
+                  className={cn(
+                    'flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-all',
+                    statsScope === 'all'
+                      ? 'bg-sky-500 text-white shadow-sm'
+                      : 'text-slate-600 hover:bg-slate-50'
+                  )}
+                >
+                  <Layers className="w-4 h-4" />
+                  全部路段
+                </button>
+                <button
+                  onClick={() => setStatsScope('favorites')}
+                  disabled={favoriteRoads.length === 0}
+                  className={cn(
+                    'flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-all',
+                    statsScope === 'favorites'
+                      ? 'bg-amber-500 text-white shadow-sm'
+                      : favoriteRoads.length === 0
+                      ? 'text-slate-300 cursor-not-allowed'
+                      : 'text-slate-600 hover:bg-slate-50'
+                  )}
+                >
+                  <Star className={cn('w-4 h-4', statsScope === 'favorites' && 'fill-white')} />
+                  收藏路段 ({favoriteRoads.length})
+                </button>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
+
+      {showComparison && favoriteStats && allStats && (
+        <Card className="border-2 border-amber-200 bg-gradient-to-br from-amber-50/50 to-sky-50/30">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Layers className="w-5 h-5 text-amber-500" />
+                收藏路段 vs 全部路段 对比
+              </CardTitle>
+              <button
+                onClick={() => setShowComparison(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center p-4 bg-white/80 rounded-xl border border-slate-100">
+                <p className="text-xs text-slate-500 mb-2">指标</p>
+              </div>
+              <div className="text-center p-4 bg-amber-50 rounded-xl border border-amber-200">
+                <div className="flex items-center justify-center gap-1 mb-2">
+                  <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                  <p className="text-xs font-medium text-amber-700">收藏路段</p>
+                </div>
+                <p className="text-xs text-slate-400">{favoriteRoads.length} 条路段</p>
+              </div>
+              <div className="text-center p-4 bg-sky-50 rounded-xl border border-sky-200">
+                <div className="flex items-center justify-center gap-1 mb-2">
+                  <Layers className="w-4 h-4 text-sky-500" />
+                  <p className="text-xs font-medium text-sky-700">全部路段</p>
+                </div>
+                <p className="text-xs text-slate-400">{predictions.length} 条路段</p>
+              </div>
+
+              <div className="flex items-center justify-center p-4 bg-white/80 rounded-xl border border-slate-100">
+                <p className="text-sm font-medium text-slate-700">总记录数</p>
+              </div>
+              <div className="text-center p-4 bg-white rounded-xl border border-amber-100">
+                <p className="text-2xl font-bold text-amber-600">{favoriteStats.totalRecords}</p>
+              </div>
+              <div className="text-center p-4 bg-white rounded-xl border border-sky-100">
+                <p className="text-2xl font-bold text-sky-600">{allStats.totalRecords}</p>
+              </div>
+
+              <div className="flex items-center justify-center p-4 bg-white/80 rounded-xl border border-slate-100">
+                <p className="text-sm font-medium text-slate-700">被溅次数</p>
+              </div>
+              <div className="text-center p-4 bg-white rounded-xl border border-amber-100">
+                <p className="text-2xl font-bold text-orange-600">{favoriteStats.totalSplashed}</p>
+              </div>
+              <div className="text-center p-4 bg-white rounded-xl border border-sky-100">
+                <p className="text-2xl font-bold text-orange-600">{allStats.totalSplashed}</p>
+              </div>
+
+              <div className="flex items-center justify-center p-4 bg-white/80 rounded-xl border border-slate-100">
+                <p className="text-sm font-medium text-slate-700">溅水率</p>
+              </div>
+              <div className="text-center p-4 bg-white rounded-xl border border-amber-100">
+                <p className="text-2xl font-bold text-amber-600">{Math.round(favoriteStats.splashRate * 100)}%</p>
+                {favoriteStats.splashRate !== allStats.splashRate && (
+                  <p className={cn(
+                    'text-xs mt-1 font-medium',
+                    favoriteStats.splashRate > allStats.splashRate ? 'text-red-500' : 'text-emerald-500'
+                  )}>
+                    {favoriteStats.splashRate > allStats.splashRate ? '↑' : '↓'} 
+                    {Math.abs(Math.round((favoriteStats.splashRate - allStats.splashRate) * 100))}%
+                  </p>
+                )}
+              </div>
+              <div className="text-center p-4 bg-white rounded-xl border border-sky-100">
+                <p className="text-2xl font-bold text-sky-600">{Math.round(allStats.splashRate * 100)}%</p>
+              </div>
+
+              <div className="flex items-center justify-center p-4 bg-white/80 rounded-xl border border-slate-100">
+                <p className="text-sm font-medium text-slate-700">平均记录/路段</p>
+              </div>
+              <div className="text-center p-4 bg-white rounded-xl border border-amber-100">
+                <p className="text-2xl font-bold text-amber-600">
+                  {favoriteRoads.length > 0 ? Math.round(favoriteStats.totalRecords / favoriteRoads.length) : 0}
+                </p>
+              </div>
+              <div className="text-center p-4 bg-white rounded-xl border border-sky-100">
+                <p className="text-2xl font-bold text-sky-600">
+                  {predictions.length > 0 ? Math.round(allStats.totalRecords / predictions.length) : 0}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="pb-3">

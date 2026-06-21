@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Search, MapPin, Droplets, Clock, ChevronDown, ChevronUp, Filter, CloudRain } from 'lucide-react';
-import { usePredictions, useWeather, useGetWeatherAdjustment, useRefreshWeather, useIsWeatherLoading } from '../store/useAppStore';
+import { Search, MapPin, Droplets, Clock, Filter, CloudRain, Star, Info } from 'lucide-react';
+import { usePredictions, useWeather, useGetWeatherAdjustment, useRefreshWeather, useIsWeatherLoading, useSettings } from '../store/useAppStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import PredictionCard from '../components/PredictionCard';
 import TimeAxis from '../components/TimeAxis';
@@ -8,7 +8,7 @@ import { getProbabilityColor, getConfidenceLabel, getConfidenceColor } from '../
 import { getProbabilityChangeText, getProbabilityChangeColor } from '../utils/weather';
 import { cn } from '../lib/utils';
 
-type SortType = 'recordCount' | 'splashProbability' | 'roadName';
+type SortType = 'recordCount' | 'splashProbability' | 'roadName' | 'favorites';
 
 export default function Schedule() {
   const predictions = usePredictions();
@@ -16,13 +16,20 @@ export default function Schedule() {
   const getWeatherAdjustment = useGetWeatherAdjustment();
   const refreshWeather = useRefreshWeather();
   const isWeatherLoading = useIsWeatherLoading();
+  const settings = useSettings();
   const [searchQuery, setSearchQuery] = useState('');
   const [sortType, setSortType] = useState<SortType>('recordCount');
   const [expandedRoad, setExpandedRoad] = useState<string | null>(null);
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [toast, setToast] = useState<{ show: boolean; message: string; isFavorite: boolean }>({
+    show: false,
+    message: '',
+    isFavorite: false,
+  });
 
   const filteredPredictions = useMemo(() => {
     let result = [...predictions];
+    const favoriteRoads = settings.favoriteRoads;
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -31,7 +38,12 @@ export default function Schedule() {
 
     switch (sortType) {
       case 'recordCount':
-        result.sort((a, b) => b.recordCount - a.recordCount);
+        result.sort((a, b) => {
+          const aFav = favoriteRoads.includes(a.roadName) ? 1 : 0;
+          const bFav = favoriteRoads.includes(b.roadName) ? 1 : 0;
+          if (aFav !== bFav) return bFav - aFav;
+          return b.recordCount - a.recordCount;
+        });
         break;
       case 'splashProbability':
         result.sort((a, b) => b.splashProbability - a.splashProbability);
@@ -39,10 +51,26 @@ export default function Schedule() {
       case 'roadName':
         result.sort((a, b) => a.roadName.localeCompare(b.roadName));
         break;
+      case 'favorites':
+        result = result.filter((p) => favoriteRoads.includes(p.roadName));
+        result.sort((a, b) => b.recordCount - a.recordCount);
+        break;
     }
 
     return result;
-  }, [predictions, searchQuery, sortType]);
+  }, [predictions, searchQuery, sortType, settings.favoriteRoads]);
+
+  const handleLongPress = (roadName: string) => {
+    const isFav = settings.favoriteRoads.includes(roadName);
+    setToast({
+      show: true,
+      message: isFav ? `已取消收藏：${roadName}` : `已收藏：${roadName}`,
+      isFavorite: !isFav,
+    });
+    setTimeout(() => {
+      setToast((prev) => ({ ...prev, show: false }));
+    }, 2000);
+  };
 
   const timeAxisData = Array.from({ length: 24 }, (_, i) => ({
     hour: i,
@@ -55,6 +83,7 @@ export default function Schedule() {
     { value: 'recordCount', label: '记录最多' },
     { value: 'splashProbability', label: '溅水概率' },
     { value: 'roadName', label: '路段名称' },
+    { value: 'favorites', label: '仅看收藏' },
   ];
 
   return (
@@ -63,6 +92,23 @@ export default function Schedule() {
         <h1 className="text-2xl font-bold text-slate-800 mb-1">洒水车时刻表</h1>
         <p className="text-slate-500 text-sm">各路段洒水车出没预测时间</p>
       </div>
+
+      <Card className="bg-amber-50/50 border-amber-200">
+        <CardContent className="py-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <Star className="w-4 h-4 text-amber-600 fill-amber-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800">长按卡片可快速收藏/取消收藏</p>
+              <p className="text-xs text-amber-600 mt-0.5">
+                已收藏 {settings.favoriteRoads.length} 个路段，收藏后将在首页优先展示
+              </p>
+            </div>
+            <Info className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          </div>
+        </CardContent>
+      </Card>
 
       {weather && (
         <Card className="border-2 border-sky-200 bg-sky-50/50">
@@ -157,6 +203,8 @@ export default function Schedule() {
             <div key={prediction.roadName} className="space-y-3">
               <PredictionCard
                 prediction={prediction}
+                enableLongPress={true}
+                onLongPress={() => handleLongPress(prediction.roadName)}
                 onClick={() =>
                   setExpandedRoad(expandedRoad === prediction.roadName ? null : prediction.roadName)
                 }
@@ -298,6 +346,30 @@ export default function Schedule() {
           </CardContent>
         </Card>
       )}
+
+      <div
+        className={cn(
+          'fixed left-1/2 -translate-x-1/2 bottom-24 z-50 transition-all duration-300',
+          toast.show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+        )}
+      >
+        <div
+          className={cn(
+            'flex items-center gap-2 px-5 py-3 rounded-2xl shadow-lg backdrop-blur-sm',
+            toast.isFavorite
+              ? 'bg-amber-500/95 text-white'
+              : 'bg-slate-700/95 text-white'
+          )}
+        >
+          <Star
+            className={cn(
+              'w-5 h-5',
+              toast.isFavorite ? 'fill-white text-white' : 'text-slate-300'
+            )}
+          />
+          <span className="font-medium text-sm">{toast.message}</span>
+        </div>
+      </div>
     </div>
   );
 }

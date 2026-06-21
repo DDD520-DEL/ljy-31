@@ -250,6 +250,43 @@ export default function Dashboard() {
         </Card>
       )}
 
+      {favoritePredictions.length > 0 && (
+        <Card className="border-2 border-amber-200 bg-gradient-to-br from-amber-50/80 to-orange-50/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center shadow-md">
+                  <Star className="w-5 h-5 text-white fill-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-slate-800">收藏路段预测</CardTitle>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    共 {favoritePredictions.length} 个收藏路段
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => navigate('/schedule')}
+                className="text-amber-600 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all px-3 py-1.5 rounded-lg hover:bg-amber-100/50"
+              >
+                管理
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {favoritePredictions.map((prediction) => (
+              <PredictionCard
+                key={prediction.roadName}
+                prediction={prediction}
+                highlight={false}
+                onClick={() => navigate('/schedule')}
+              />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-3 gap-3">
         <Card hover className="text-center">
           <CardContent className="py-5">
@@ -290,34 +327,6 @@ export default function Dashboard() {
           <TimeAxis data={timeAxisData} />
         </CardContent>
       </Card>
-
-      {favoritePredictions.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
-            <h2 className="text-lg font-semibold text-slate-800">常用路段预测</h2>
-          </div>
-            <button
-              onClick={() => navigate('/schedule')}
-              className="text-sky-600 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all"
-            >
-              管理
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="space-y-3">
-            {favoritePredictions.slice(0, 3).map((prediction) => (
-              <PredictionCard
-                key={prediction.roadName}
-                prediction={prediction}
-                highlight={true}
-                onClick={() => navigate('/schedule')}
-              />
-            ))}
-          </div>
-        </div>
-      )}
 
       {todayPredictions.length > 0 && (
         <div>
