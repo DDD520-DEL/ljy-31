@@ -8,6 +8,7 @@ import Statistics from './pages/Statistics';
 import Settings from './pages/Settings';
 import Community from './pages/Community';
 import RouteResult from './pages/RouteResult';
+import Calendar from './pages/Calendar';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/history" element={<History />} />
           <Route path="/statistics" element={<Statistics />} />
+          <Route path="/calendar" element={<Calendar />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/community" element={<Community />} />
           <Route path="/route" element={<RouteResult />} />
