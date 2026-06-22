@@ -14,6 +14,7 @@ import {
   CommunityRoadStats,
   ContributionStats,
   CommunitySettings,
+  RouteLibraryItem,
 } from '../types';
 import { storage } from '../utils/storage';
 import {
@@ -96,6 +97,10 @@ const getInitialPhotos = (): Photo[] => {
   return storage.get<Photo[]>(StorageKeys.PHOTOS, []);
 };
 
+const getInitialRouteLibrary = (): RouteLibraryItem[] => {
+  return storage.get<RouteLibraryItem[]>(StorageKeys.ROUTE_LIBRARY, []);
+};
+
 const initialRecords = getInitialRecords();
 const initialSettings = getInitialSettings();
 const initialCommunityRecords = getInitialCommunityRecords(initialRecords);
@@ -112,6 +117,7 @@ const initialLatestWeeklyReport =
     : null;
 const initialPhotos = getInitialPhotos();
 const initialStorageInfo = generateStorageInfo(initialPhotos);
+const initialRouteLibrary = getInitialRouteLibrary();
 const initialCommunityRoadStats = communityService.generateRoadStats(initialCommunityRecords);
 const initialContributionStats = communityService.generateContributionStats(
   initialRecords,
@@ -135,6 +141,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isCommunitySyncing: false,
   photos: initialPhotos,
   storageInfo: initialStorageInfo,
+  routeLibrary: initialRouteLibrary,
 
   addRecord: (recordData) => {
     const now = Date.now();
@@ -600,6 +607,53 @@ export const useAppStore = create<AppState>((set, get) => ({
     const stats = communityService.generateContributionStats(records, settings.community);
     set({ contributionStats: stats });
   },
+
+  addRouteItem: (itemData) => {
+    const now = Date.now();
+    const newItem: RouteLibraryItem = {
+      ...itemData,
+      id: generateId(),
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    set((state) => {
+      const newRouteLibrary = [...state.routeLibrary, newItem];
+      storage.set(StorageKeys.ROUTE_LIBRARY, newRouteLibrary);
+      return { routeLibrary: newRouteLibrary };
+    });
+
+    return newItem;
+  },
+
+  updateRouteItem: (id, updates) => {
+    set((state) => {
+      const newRouteLibrary = state.routeLibrary.map((item) =>
+        item.id === id
+          ? { ...item, ...updates, updatedAt: Date.now() }
+          : item
+      );
+      storage.set(StorageKeys.ROUTE_LIBRARY, newRouteLibrary);
+      return { routeLibrary: newRouteLibrary };
+    });
+  },
+
+  deleteRouteItem: (id) => {
+    set((state) => {
+      const newRouteLibrary = state.routeLibrary.filter((item) => item.id !== id);
+      storage.set(StorageKeys.ROUTE_LIBRARY, newRouteLibrary);
+      return { routeLibrary: newRouteLibrary };
+    });
+  },
+
+  getRouteLibrary: () => {
+    return get().routeLibrary;
+  },
+
+  refreshRouteLibrary: () => {
+    const routeLibrary = getInitialRouteLibrary();
+    set({ routeLibrary });
+  },
 }));
 
 export const useRecords = () => useAppStore((state) => state.records);
@@ -694,3 +748,10 @@ export const useUpdateCommunitySettings = () => useAppStore((state) => state.upd
 export const useRefreshCommunityRoadStats = () => useAppStore((state) => state.refreshCommunityRoadStats);
 export const useRefreshContributionStats = () => useAppStore((state) => state.refreshContributionStats);
 export const useGetMergedRecords = () => useAppStore((state) => state.getMergedRecords);
+
+export const useRouteLibrary = () => useAppStore((state) => state.routeLibrary);
+export const useAddRouteItem = () => useAppStore((state) => state.addRouteItem);
+export const useUpdateRouteItem = () => useAppStore((state) => state.updateRouteItem);
+export const useDeleteRouteItem = () => useAppStore((state) => state.deleteRouteItem);
+export const useGetRouteLibrary = () => useAppStore((state) => state.getRouteLibrary);
+export const useRefreshRouteLibrary = () => useAppStore((state) => state.refreshRouteLibrary);

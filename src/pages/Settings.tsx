@@ -35,6 +35,7 @@ import {
   Share2,
   Database,
   Trophy,
+  BookOpen,
 } from 'lucide-react';
 import {
   useSettings,
@@ -55,6 +56,7 @@ import {
   useContributionStats,
   useShareAllRecords,
   useIsCommunitySyncing,
+  useRouteLibrary,
 } from '../store/useAppStore';
 import { formatSize, getStorageUsagePercentage, DEFAULT_STORAGE_QUOTA_MB } from '../utils/storageManager';
 import {
@@ -121,6 +123,7 @@ export default function SettingsPage() {
   const contributionStats = useContributionStats();
   const shareAllRecords = useShareAllRecords();
   const isCommunitySyncing = useIsCommunitySyncing();
+  const routeLibrary = useRouteLibrary();
 
   const quotaOptions = [50, 100, 200, 500, 1000];
   const currentQuotaMB = Math.round(storageInfo.quotaLimit / (1024 * 1024));
@@ -899,6 +902,37 @@ export default function SettingsPage() {
               </Button>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-sky-500" />
+            路线库管理
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <button
+            onClick={() => navigate('/route-library')}
+            className="w-full flex items-center justify-between p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-sky-100 flex items-center justify-center">
+                <MapPin className="w-5 h-5 text-sky-600" />
+              </div>
+              <div className="text-left">
+                <p className="font-medium text-slate-800">我的路线库</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  已保存 {routeLibrary.length} 条常用路线
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-slate-400" />
+          </button>
+          <p className="text-xs text-slate-400 mt-3">
+            预先维护常走路段，记录时可快速选择
+          </p>
         </CardContent>
       </Card>
 

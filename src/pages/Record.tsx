@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Droplets, MapPin, Clock, MessageSquare, Check, X, ArrowLeft, Camera, Sparkles } from 'lucide-react';
-import { useAddRecord, useUpdateRecord, useRecords, useAddPhoto, useGetPhotosByRecordId, usePhotos, useAppStore, useDeletePhoto, useUpdatePhoto } from '../store/useAppStore';
+import { Droplets, MapPin, Clock, MessageSquare, Check, X, ArrowLeft, Camera, Sparkles, BookOpen, Tag, Navigation } from 'lucide-react';
+import { useAddRecord, useUpdateRecord, useRecords, useAddPhoto, useGetPhotosByRecordId, usePhotos, useAppStore, useDeletePhoto, useUpdatePhoto, useRouteLibrary } from '../store/useAppStore';
 import { useRoadList } from '../hooks/usePredictions';
 import { Button } from '../components/Button';
 import { Card, CardContent } from '../components/Card';
@@ -18,6 +18,13 @@ const directions = [
   { value: 'north', label: '向北' },
 ];
 
+const directionLabels: Record<string, string> = {
+  east: '向东',
+  west: '向西',
+  south: '向南',
+  north: '向北',
+};
+
 export default function Record() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -25,6 +32,7 @@ export default function Record() {
   const updateRecord = useUpdateRecord();
   const records = useRecords();
   const roadList = useRoadList();
+  const routeLibrary = useRouteLibrary();
   const addPhoto = useAddPhoto();
   const deletePhoto = useDeletePhoto();
   const updatePhoto = useUpdatePhoto();
@@ -48,6 +56,7 @@ export default function Record() {
   const [direction, setDirection] = useState(existingRecord?.direction || '');
   const [note, setNote] = useState(existingRecord?.note || '');
   const [showRoadSuggestions, setShowRoadSuggestions] = useState(false);
+  const [showRouteLibrary, setShowRouteLibrary] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [tempPhotos, setTempPhotos] = useState<TempPhoto[]>(
@@ -222,10 +231,77 @@ export default function Record() {
           </div>
 
           <div className="space-y-3">
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <MapPin className="w-4 h-4 text-sky-500" />
-              路段
+            <label className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <MapPin className="w-4 h-4 text-sky-500" />
+                路段
+              </div>
+              {routeLibrary.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowRouteLibrary(!showRouteLibrary)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
+                    showRouteLibrary
+                      ? 'bg-sky-500 text-white'
+                      : 'bg-sky-50 text-sky-600 hover:bg-sky-100'
+                  )}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  路线库
+                </button>
+              )}
             </label>
+
+            {showRouteLibrary && routeLibrary.length > 0 && (
+              <div className="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-200">
+                <p className="text-xs text-slate-500 mb-2">从路线库快速选择：</p>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {routeLibrary.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setRoad(item.roadName);
+                        if (item.direction) {
+                          setDirection(item.direction);
+                        }
+                        if (item.note && !note) {
+                          setNote(item.note);
+                        }
+                        setShowRouteLibrary(false);
+                      }}
+                      className="w-full p-3 rounded-lg bg-white border border-slate-200 hover:border-sky-300 hover:bg-sky-50 transition-all text-left group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-slate-800 group-hover:text-sky-700">
+                          {item.roadName}
+                        </span>
+                        {item.direction && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-medium rounded-md">
+                            <Navigation className="w-3 h-3" />
+                            {directionLabels[item.direction]}
+                          </span>
+                        )}
+                      </div>
+                      {item.tags && item.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {item.tags.slice(0, 3).map((tag, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 text-amber-600 text-xs font-medium rounded"
+                            >
+                              <Tag className="w-2.5 h-2.5" />
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="relative">
               <input
                 type="text"

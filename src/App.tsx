@@ -9,6 +9,7 @@ import Settings from './pages/Settings';
 import Community from './pages/Community';
 import RouteResult from './pages/RouteResult';
 import Calendar from './pages/Calendar';
+import RouteLibrary from './pages/RouteLibrary';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/community" element={<Community />} />
           <Route path="/route" element={<RouteResult />} />
+          <Route path="/route-library" element={<RouteLibrary />} />
         </Route>
       </Routes>
     </Router>

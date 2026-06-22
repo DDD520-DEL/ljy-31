@@ -260,6 +260,7 @@ export enum StorageKeys {
   STORAGE_QUOTA = 'sprinkler_storage_quota',
   COMMUNITY_RECORDS = 'sprinkler_community_records',
   COMMUNITY_SYNCED_IDS = 'sprinkler_community_synced_ids',
+  ROUTE_LIBRARY = 'sprinkler_route_library',
 }
 
 export type SearchResultType = 'road' | 'record' | 'statistic';
@@ -379,7 +380,24 @@ export interface HeatmapRoadData {
   overallRisk: number;
 }
 
+export interface RouteLibraryItem {
+  id: string;
+  roadName: string;
+  direction?: 'east' | 'west' | 'south' | 'north';
+  tags: string[];
+  note?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface AppState {
+  routeLibrary: RouteLibraryItem[];
+  addRouteItem: (item: Omit<RouteLibraryItem, 'id' | 'createdAt' | 'updatedAt'>) => RouteLibraryItem;
+  updateRouteItem: (id: string, updates: Partial<RouteLibraryItem>) => void;
+  deleteRouteItem: (id: string) => void;
+  getRouteLibrary: () => RouteLibraryItem[];
+  refreshRouteLibrary: () => void;
+
   records: SprinklerRecord[];
   communityRecords: SprinklerRecord[];
   predictions: RoadPrediction[];
