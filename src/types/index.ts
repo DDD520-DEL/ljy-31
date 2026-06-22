@@ -263,6 +263,7 @@ export enum StorageKeys {
   ROUTE_LIBRARY = 'sprinkler_route_library',
   DASHBOARD_CARDS = 'sprinkler_dashboard_cards',
   ACHIEVEMENTS = 'sprinkler_achievements',
+  RECORD_TEMPLATES = 'sprinkler_record_templates',
 }
 
 export type AchievementCategory = 'record' | 'streak' | 'exploration' | 'milestone';
@@ -569,6 +570,17 @@ export interface RouteLibraryItem {
   updatedAt: number;
 }
 
+export interface RecordTemplate {
+  id: string;
+  name: string;
+  road: string;
+  direction?: 'east' | 'west' | 'south' | 'north';
+  isSplashed: boolean;
+  note?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface AppState {
   routeLibrary: RouteLibraryItem[];
   addRouteItem: (item: Omit<RouteLibraryItem, 'id' | 'createdAt' | 'updatedAt'>) => RouteLibraryItem;
@@ -576,6 +588,13 @@ export interface AppState {
   deleteRouteItem: (id: string) => void;
   getRouteLibrary: () => RouteLibraryItem[];
   refreshRouteLibrary: () => void;
+
+  recordTemplates: RecordTemplate[];
+  addRecordTemplate: (template: Omit<RecordTemplate, 'id' | 'createdAt' | 'updatedAt'>) => RecordTemplate;
+  updateRecordTemplate: (id: string, updates: Partial<RecordTemplate>) => void;
+  deleteRecordTemplate: (id: string) => void;
+  getRecordTemplates: () => RecordTemplate[];
+  refreshRecordTemplates: () => void;
 
   records: SprinklerRecord[];
   communityRecords: SprinklerRecord[];

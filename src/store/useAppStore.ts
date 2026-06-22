@@ -15,6 +15,7 @@ import {
   ContributionStats,
   CommunitySettings,
   RouteLibraryItem,
+  RecordTemplate,
   Achievement,
   UserAchievement,
   AchievementProgress,
@@ -109,6 +110,10 @@ const getInitialRouteLibrary = (): RouteLibraryItem[] => {
   return storage.get<RouteLibraryItem[]>(StorageKeys.ROUTE_LIBRARY, []);
 };
 
+const getInitialRecordTemplates = (): RecordTemplate[] => {
+  return storage.get<RecordTemplate[]>(StorageKeys.RECORD_TEMPLATES, []);
+};
+
 const getInitialUserAchievements = (): UserAchievement[] => {
   return storage.get<UserAchievement[]>(StorageKeys.ACHIEVEMENTS, []);
 };
@@ -130,6 +135,7 @@ const initialLatestWeeklyReport =
 const initialPhotos = getInitialPhotos();
 const initialStorageInfo = generateStorageInfo(initialPhotos);
 const initialRouteLibrary = getInitialRouteLibrary();
+const initialRecordTemplates = getInitialRecordTemplates();
 const initialCommunityRoadStats = communityService.generateRoadStats(initialCommunityRecords);
 const initialContributionStats = communityService.generateContributionStats(
   initialRecords,
@@ -157,6 +163,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   photos: initialPhotos,
   storageInfo: initialStorageInfo,
   routeLibrary: initialRouteLibrary,
+  recordTemplates: initialRecordTemplates,
   achievements: ACHIEVEMENTS,
   userAchievements: initialUserAchievements,
   achievementProgress: initialAchievementProgress,
@@ -675,6 +682,53 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ routeLibrary });
   },
 
+  addRecordTemplate: (templateData) => {
+    const now = Date.now();
+    const newTemplate: RecordTemplate = {
+      ...templateData,
+      id: generateId(),
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    set((state) => {
+      const newRecordTemplates = [...state.recordTemplates, newTemplate];
+      storage.set(StorageKeys.RECORD_TEMPLATES, newRecordTemplates);
+      return { recordTemplates: newRecordTemplates };
+    });
+
+    return newTemplate;
+  },
+
+  updateRecordTemplate: (id, updates) => {
+    set((state) => {
+      const newRecordTemplates = state.recordTemplates.map((template) =>
+        template.id === id
+          ? { ...template, ...updates, updatedAt: Date.now() }
+          : template
+      );
+      storage.set(StorageKeys.RECORD_TEMPLATES, newRecordTemplates);
+      return { recordTemplates: newRecordTemplates };
+    });
+  },
+
+  deleteRecordTemplate: (id) => {
+    set((state) => {
+      const newRecordTemplates = state.recordTemplates.filter((template) => template.id !== id);
+      storage.set(StorageKeys.RECORD_TEMPLATES, newRecordTemplates);
+      return { recordTemplates: newRecordTemplates };
+    });
+  },
+
+  getRecordTemplates: () => {
+    return get().recordTemplates;
+  },
+
+  refreshRecordTemplates: () => {
+    const recordTemplates = getInitialRecordTemplates();
+    set({ recordTemplates });
+  },
+
   checkAchievements: () => {
     const { records, userAchievements, achievements } = get();
     const progress = calculateAchievementProgress(records, achievements);
@@ -858,6 +912,13 @@ export const useUpdateRouteItem = () => useAppStore((state) => state.updateRoute
 export const useDeleteRouteItem = () => useAppStore((state) => state.deleteRouteItem);
 export const useGetRouteLibrary = () => useAppStore((state) => state.getRouteLibrary);
 export const useRefreshRouteLibrary = () => useAppStore((state) => state.refreshRouteLibrary);
+
+export const useRecordTemplates = () => useAppStore((state) => state.recordTemplates);
+export const useAddRecordTemplate = () => useAppStore((state) => state.addRecordTemplate);
+export const useUpdateRecordTemplate = () => useAppStore((state) => state.updateRecordTemplate);
+export const useDeleteRecordTemplate = () => useAppStore((state) => state.deleteRecordTemplate);
+export const useGetRecordTemplates = () => useAppStore((state) => state.getRecordTemplates);
+export const useRefreshRecordTemplates = () => useAppStore((state) => state.refreshRecordTemplates);
 
 export const useAchievements = () => useAppStore((state) => state.achievements);
 export const useUserAchievements = () => useAppStore((state) => state.userAchievements);

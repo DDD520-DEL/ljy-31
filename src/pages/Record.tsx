@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Droplets, MapPin, Clock, MessageSquare, Check, X, ArrowLeft, Camera, Sparkles, BookOpen, Tag, Navigation, Mic } from 'lucide-react';
-import { useAddRecord, useUpdateRecord, useRecords, useAddPhoto, useGetPhotosByRecordId, usePhotos, useAppStore, useDeletePhoto, useUpdatePhoto, useRouteLibrary } from '../store/useAppStore';
+import { Droplets, MapPin, Clock, MessageSquare, Check, X, ArrowLeft, Camera, Sparkles, BookOpen, Tag, Navigation, Mic, FileText } from 'lucide-react';
+import { useAddRecord, useUpdateRecord, useRecords, useAddPhoto, useGetPhotosByRecordId, usePhotos, useAppStore, useDeletePhoto, useUpdatePhoto, useRouteLibrary, useRecordTemplates } from '../store/useAppStore';
 import { useRoadList } from '../hooks/usePredictions';
 import { Button } from '../components/Button';
 import { Card, CardContent } from '../components/Card';
@@ -35,6 +35,7 @@ export default function Record() {
   const records = useRecords();
   const roadList = useRoadList();
   const routeLibrary = useRouteLibrary();
+  const recordTemplates = useRecordTemplates();
   const addPhoto = useAddPhoto();
   const deletePhoto = useDeletePhoto();
   const updatePhoto = useUpdatePhoto();
@@ -59,6 +60,7 @@ export default function Record() {
   const [note, setNote] = useState(existingRecord?.note || '');
   const [showRoadSuggestions, setShowRoadSuggestions] = useState(false);
   const [showRouteLibrary, setShowRouteLibrary] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [speechResult, setSpeechResult] = useState<ParsedSpeechResult | null>(null);
   const [showSpeechConfirm, setShowSpeechConfirm] = useState(false);
@@ -266,6 +268,88 @@ export default function Record() {
 
       <Card>
         <CardContent className="space-y-6">
+          {!isEditing && recordTemplates.length > 0 && (
+            <div className="space-y-3 pb-4 border-b border-slate-100">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                  <FileText className="w-4 h-4 text-sky-500" />
+                  从模板快速创建
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowTemplates(!showTemplates)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
+                    showTemplates
+                      ? 'bg-sky-500 text-white'
+                      : 'bg-sky-50 text-sky-600 hover:bg-sky-100'
+                  )}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  选择模板
+                </button>
+              </div>
+
+              {showTemplates && recordTemplates.length > 0 && (
+                <div className="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-200">
+                  <p className="text-xs text-slate-500 mb-2">选择一个模板快速填充所有字段：</p>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {recordTemplates.map((template) => (
+                      <button
+                        key={template.id}
+                        onClick={() => {
+                          setRoad(template.road);
+                          setIsSplashed(template.isSplashed);
+                          if (template.direction) {
+                            setDirection(template.direction);
+                          }
+                          if (template.note) {
+                            setNote(template.note);
+                          }
+                          setShowTemplates(false);
+                        }}
+                        className="w-full p-3 rounded-lg bg-white border border-slate-200 hover:border-sky-300 hover:bg-sky-50 transition-all text-left group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-slate-800 group-hover:text-sky-700">
+                            {template.name}
+                          </span>
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md',
+                              template.isSplashed
+                                ? 'bg-orange-100 text-orange-600'
+                                : 'bg-emerald-100 text-emerald-600'
+                            )}
+                          >
+                            {template.isSplashed ? '被溅到' : '未溅到'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <span className="text-xs text-slate-500 flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-slate-400" />
+                            {template.road}
+                          </span>
+                          {template.direction && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 text-slate-600 text-xs rounded">
+                              <Navigation className="w-3 h-3" />
+                              {directionLabels[template.direction]}
+                            </span>
+                          )}
+                        </div>
+                        {template.note && (
+                          <p className="text-xs text-slate-400 mt-1 line-clamp-1">
+                            {template.note}
+                          </p>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-3">
             <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <Clock className="w-4 h-4 text-sky-500" />

@@ -10,6 +10,7 @@ import Community from './pages/Community';
 import RouteResult from './pages/RouteResult';
 import Calendar from './pages/Calendar';
 import RouteLibrary from './pages/RouteLibrary';
+import RecordTemplates from './pages/RecordTemplates';
 import Achievements from './pages/Achievements';
 
 export default function App() {
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/community" element={<Community />} />
           <Route path="/route" element={<RouteResult />} />
           <Route path="/route-library" element={<RouteLibrary />} />
+          <Route path="/record-templates" element={<RecordTemplates />} />
           <Route path="/achievements" element={<Achievements />} />
         </Route>
       </Routes>
