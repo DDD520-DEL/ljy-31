@@ -11,6 +11,9 @@ import {
   ImportReport,
   Photo,
   StorageInfo,
+  CommunityRoadStats,
+  ContributionStats,
+  CommunitySettings,
 } from '../types';
 import { storage } from '../utils/storage';
 import {
@@ -27,6 +30,7 @@ import {
   generateStorageInfo,
   setStorageQuota as setStorageQuotaFn,
 } from '../utils/storageManager';
+import { communityService } from '../services/community';
 
 const defaultWeeklyReportSettings: WeeklyReportSettings = {
   autoGenerate: true,
@@ -38,6 +42,8 @@ const defaultWeeklyReportSettings: WeeklyReportSettings = {
   bannerDismissed: {},
 };
 
+const defaultCommunitySettings: CommunitySettings = communityService.getDefaultCommunitySettings();
+
 const defaultSettings: AppSettings = {
   theme: 'light',
   reminderEnabled: true,
@@ -45,6 +51,7 @@ const defaultSettings: AppSettings = {
   favoriteRoads: [],
   weatherNotificationEnabled: true,
   weeklyReport: defaultWeeklyReportSettings,
+  community: defaultCommunitySettings,
 };
 
 const getInitialRecords = (): SprinklerRecord[] => {
@@ -70,7 +77,15 @@ const getInitialSettings = (): AppSettings => {
       ...defaultWeeklyReportSettings,
       ...(stored.weeklyReport || {}),
     },
+    community: {
+      ...defaultCommunitySettings,
+      ...(stored.community || {}),
+    },
   };
+};
+
+const getInitialCommunityRecords = (localRecords: SprinklerRecord[]): SprinklerRecord[] => {
+  return communityService.getCommunityRecords(localRecords);
 };
 
 const getInitialWeeklyReports = (): WeeklyReport[] => {
@@ -82,9 +97,13 @@ const getInitialPhotos = (): Photo[] => {
 };
 
 const initialRecords = getInitialRecords();
-const initialPredictions = generateAllPredictions(initialRecords);
-const initialStatistics = generateStatistics(initialRecords);
 const initialSettings = getInitialSettings();
+const initialCommunityRecords = getInitialCommunityRecords(initialRecords);
+const initialMergedRecords = initialSettings.community.useCommunityData
+  ? [...initialRecords, ...initialCommunityRecords]
+  : initialRecords;
+const initialPredictions = generateAllPredictions(initialMergedRecords);
+const initialStatistics = generateStatistics(initialRecords);
 const initialWeather = getInitialWeather();
 const initialWeeklyReports = getInitialWeeklyReports();
 const initialLatestWeeklyReport =
@@ -93,11 +112,19 @@ const initialLatestWeeklyReport =
     : null;
 const initialPhotos = getInitialPhotos();
 const initialStorageInfo = generateStorageInfo(initialPhotos);
+const initialCommunityRoadStats = communityService.generateRoadStats(initialCommunityRecords);
+const initialContributionStats = communityService.generateContributionStats(
+  initialRecords,
+  initialSettings.community
+);
 
 export const useAppStore = create<AppState>((set, get) => ({
   records: initialRecords,
+  communityRecords: initialCommunityRecords,
   predictions: initialPredictions,
   statistics: initialStatistics,
+  communityRoadStats: initialCommunityRoadStats,
+  contributionStats: initialContributionStats,
   settings: initialSettings,
   weather: initialWeather,
   weeklyReports: initialWeeklyReports,
@@ -105,6 +132,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isLoading: false,
   isWeatherLoading: false,
   isGeneratingReport: false,
+  isCommunitySyncing: false,
   photos: initialPhotos,
   storageInfo: initialStorageInfo,
 
@@ -115,6 +143,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       id: generateId(),
       createdAt: now,
       updatedAt: now,
+      dataSource: 'local',
     };
 
     set((state) => {
@@ -122,6 +151,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       storage.set(StorageKeys.RECORDS, newRecords);
       return { records: newRecords };
     });
+
+    const { settings } = get();
+    if (settings.community.enabled && settings.community.autoShare) {
+      get().shareRecordToCommunity(newRecord.id);
+    }
 
     get().refreshPredictions();
     get().refreshStatistics();
@@ -168,10 +202,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   refreshPredictions: () => {
-    const { records } = get();
-    const predictions = generateAllPredictions(records);
+    const { records, communityRecords, settings } = get();
+    const mergedRecords = settings.community.useCommunityData
+      ? [...records, ...communityRecords]
+      : records;
+    const predictions = generateAllPredictions(mergedRecords);
     storage.set(StorageKeys.PREDICTIONS, predictions);
     set({ predictions });
+  },
+
+  getMergedRecords: () => {
+    const { records, communityRecords, settings } = get();
+    return settings.community.useCommunityData
+      ? [...records, ...communityRecords]
+      : records;
   },
 
   refreshStatistics: () => {
@@ -432,6 +476,130 @@ export const useAppStore = create<AppState>((set, get) => ({
       storageInfo: generateStorageInfo([]),
     });
   },
+
+  shareRecordToCommunity: async (recordId: string): Promise<boolean> => {
+    const { records, settings } = get();
+    const record = records.find(r => r.id === recordId);
+    if (!record || !settings.community.enabled) return false;
+
+    set({ isCommunitySyncing: true });
+    try {
+      const success = await communityService.submitRecord(record, settings.community);
+      if (success) {
+        const newSettings = {
+          ...settings,
+          community: {
+            ...settings.community,
+            contributedCount: settings.community.contributedCount + 1,
+            lastSyncAt: Date.now(),
+          },
+        };
+        storage.set(StorageKeys.SETTINGS, newSettings);
+        set({
+          settings: newSettings,
+          isCommunitySyncing: false,
+        });
+        get().refreshContributionStats();
+        get().refreshCommunityRoadStats();
+      } else {
+        set({ isCommunitySyncing: false });
+      }
+      return success;
+    } catch (error) {
+      set({ isCommunitySyncing: false });
+      return false;
+    }
+  },
+
+  shareMultipleRecords: async (recordIds: string[]): Promise<number> => {
+    const { records, settings } = get();
+    if (!settings.community.enabled) return 0;
+
+    const targetRecords = records.filter(r => recordIds.includes(r.id));
+    if (targetRecords.length === 0) return 0;
+
+    set({ isCommunitySyncing: true });
+    try {
+      const submitted = await communityService.submitRecords(targetRecords, settings.community);
+      if (submitted > 0) {
+        const newSettings = {
+          ...settings,
+          community: {
+            ...settings.community,
+            contributedCount: settings.community.contributedCount + submitted,
+            lastSyncAt: Date.now(),
+          },
+        };
+        storage.set(StorageKeys.SETTINGS, newSettings);
+        set({
+          settings: newSettings,
+          isCommunitySyncing: false,
+        });
+        get().refreshContributionStats();
+        get().refreshCommunityRoadStats();
+      } else {
+        set({ isCommunitySyncing: false });
+      }
+      return submitted;
+    } catch (error) {
+      set({ isCommunitySyncing: false });
+      return 0;
+    }
+  },
+
+  shareAllRecords: async (): Promise<number> => {
+    const { records } = get();
+    return get().shareMultipleRecords(records.map(r => r.id));
+  },
+
+  syncCommunityData: async (): Promise<void> => {
+    const { records, settings } = get();
+    if (!settings.community.enabled) return;
+
+    set({ isCommunitySyncing: true });
+    try {
+      const communityRecords = await communityService.fetchCommunityData(records);
+      const newSettings = {
+        ...settings,
+        community: {
+          ...settings.community,
+          lastSyncAt: Date.now(),
+        },
+      };
+      storage.set(StorageKeys.SETTINGS, newSettings);
+      set({
+        communityRecords,
+        settings: newSettings,
+        isCommunitySyncing: false,
+      });
+      get().refreshPredictions();
+      get().refreshCommunityRoadStats();
+    } catch (error) {
+      set({ isCommunitySyncing: false });
+    }
+  },
+
+  updateCommunitySettings: (updates: Partial<CommunitySettings>): void => {
+    set((state) => {
+      const newCommunitySettings = { ...state.settings.community, ...updates };
+      const newSettings = { ...state.settings, community: newCommunitySettings };
+      storage.set(StorageKeys.SETTINGS, newSettings);
+      return { settings: newSettings };
+    });
+    get().refreshPredictions();
+  },
+
+  refreshCommunityRoadStats: (): void => {
+    const { communityRecords } = get();
+    const stats = communityService.generateRoadStats(communityRecords);
+    set({ communityRoadStats: stats });
+  },
+
+  refreshContributionStats: (): void => {
+    const { records, settings } = get();
+    const stats = communityService.generateContributionStats(records, settings.community);
+    set({ contributionStats: stats });
+  },
 }));
 
 export const useRecords = () => useAppStore((state) => state.records);
@@ -460,7 +628,9 @@ export const useCreateRecordFromNow = () => {
       dayOfWeek: date.getDay(),
       road,
       isSplashed,
-      note,
+      direction: 'east',
+      note: note || '',
+      dataSource: 'local',
     });
   };
 };
@@ -510,3 +680,17 @@ export const useGetPhotosByRecordId = () => useAppStore((state) => state.getPhot
 export const useRefreshStorageInfo = () => useAppStore((state) => state.refreshStorageInfo);
 export const useSetStorageQuota = () => useAppStore((state) => state.setStorageQuota);
 export const useClearAllPhotos = () => useAppStore((state) => state.clearAllPhotos);
+
+export const useCommunityRecords = () => useAppStore((state) => state.communityRecords);
+export const useCommunityRoadStats = () => useAppStore((state) => state.communityRoadStats);
+export const useContributionStats = () => useAppStore((state) => state.contributionStats);
+export const useCommunitySettings = () => useAppStore((state) => state.settings.community);
+export const useIsCommunitySyncing = () => useAppStore((state) => state.isCommunitySyncing);
+export const useShareRecordToCommunity = () => useAppStore((state) => state.shareRecordToCommunity);
+export const useShareMultipleRecords = () => useAppStore((state) => state.shareMultipleRecords);
+export const useShareAllRecords = () => useAppStore((state) => state.shareAllRecords);
+export const useSyncCommunityData = () => useAppStore((state) => state.syncCommunityData);
+export const useUpdateCommunitySettings = () => useAppStore((state) => state.updateCommunitySettings);
+export const useRefreshCommunityRoadStats = () => useAppStore((state) => state.refreshCommunityRoadStats);
+export const useRefreshContributionStats = () => useAppStore((state) => state.refreshContributionStats);
+export const useGetMergedRecords = () => useAppStore((state) => state.getMergedRecords);

@@ -109,6 +109,8 @@ export const generateRoadPrediction = (roadName: string, records: SprinklerRecor
   const splashCount = records.filter(r => r.isSplashed).length;
   const predictedTimes = clusterTimes(records);
   const hourlyDistribution = calculateHourlyDistribution(records);
+  const localRecordCount = records.filter(r => r.dataSource === 'local' || !r.dataSource).length;
+  const communityRecordCount = records.filter(r => r.dataSource === 'community').length;
 
   return {
     roadName,
@@ -118,6 +120,8 @@ export const generateRoadPrediction = (roadName: string, records: SprinklerRecor
     predictedTimes,
     hourlyDistribution,
     lastUpdated: Date.now(),
+    localRecordCount,
+    communityRecordCount,
   };
 };
 

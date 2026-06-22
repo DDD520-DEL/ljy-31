@@ -1,9 +1,9 @@
 import { useState, useRef } from 'react';
 import { getProbabilityColor, getProbabilityBgLight, getConfidenceLabel, getConfidenceColor } from '../utils/format';
 import { RoadPrediction } from '../types';
-import { useIsFavoriteRoad, useToggleFavoriteRoad, useWeather } from '../store/useAppStore';
+import { useIsFavoriteRoad, useToggleFavoriteRoad, useWeather, useCommunitySettings } from '../store/useAppStore';
 import { useRoadWeatherAdjustment } from '../hooks/useWeather';
-import { Droplets, MapPin, TrendingUp, Star, CloudRain } from 'lucide-react';
+import { Droplets, MapPin, TrendingUp, Star, CloudRain, Globe, User } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface PredictionCardProps {
@@ -24,6 +24,7 @@ export default function PredictionCard({
   onLongPress,
 }: PredictionCardProps) {
   const weather = useWeather();
+  const communitySettings = useCommunitySettings();
   const weatherAdjustment = useRoadWeatherAdjustment(prediction.splashProbability);
   const isFavorite = useIsFavoriteRoad(prediction.roadName);
   const toggleFavorite = useToggleFavoriteRoad();
@@ -31,6 +32,9 @@ export default function PredictionCard({
   const [isLongPressing, setIsLongPressing] = useState(false);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPressTriggeredRef = useRef(false);
+
+  const hasCommunityData = communitySettings.enabled && communitySettings.useCommunityData && prediction.communityRecordCount > 0;
+  const hasLocalData = prediction.localRecordCount > 0;
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -103,7 +107,21 @@ export default function PredictionCard({
           </div>
           <div>
             <h3 className="font-semibold text-slate-800">{prediction.roadName}</h3>
-            <p className="text-sm text-slate-500">{prediction.recordCount} 条记录</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-sm text-slate-500">{prediction.recordCount} 条记录</span>
+              {hasCommunityData && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-purple-100 text-purple-600 text-xs font-medium">
+                  <Globe className="w-3 h-3" />
+                  社区
+                </span>
+              )}
+              {hasLocalData && hasCommunityData && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-sky-100 text-sky-600 text-xs font-medium">
+                  <User className="w-3 h-3" />
+                  本地
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">

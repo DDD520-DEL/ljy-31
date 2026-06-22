@@ -195,8 +195,9 @@ const rowToRecord = (
       dayOfWeek: getDayOfWeek(timestamp),
       road,
       isSplashed: isSplashed!,
-      direction,
-      note,
+      direction: direction || 'east',
+      note: note || '',
+      dataSource: 'local' as const,
     },
     errors: [],
   };

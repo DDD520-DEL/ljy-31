@@ -6,6 +6,7 @@ import Schedule from './pages/Schedule';
 import History from './pages/History';
 import Statistics from './pages/Statistics';
 import Settings from './pages/Settings';
+import Community from './pages/Community';
 import RouteResult from './pages/RouteResult';
 
 export default function App() {
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/history" element={<History />} />
           <Route path="/statistics" element={<Statistics />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/community" element={<Community />} />
           <Route path="/route" element={<RouteResult />} />
         </Route>
       </Routes>

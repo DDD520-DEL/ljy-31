@@ -35,6 +35,7 @@ const generateMockRecord = (
     note: undefined,
     createdAt: timestamp,
     updatedAt: timestamp,
+    dataSource: 'local',
   };
 };
 

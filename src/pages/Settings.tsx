@@ -26,6 +26,15 @@ import {
   HardDrive,
   Camera,
   Image,
+  Globe,
+  Users,
+  UserX,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  Share2,
+  Database,
+  Trophy,
 } from 'lucide-react';
 import {
   useSettings,
@@ -41,6 +50,11 @@ import {
   usePhotos,
   useSetStorageQuota,
   useClearAllPhotos,
+  useCommunitySettings,
+  useUpdateCommunitySettings,
+  useContributionStats,
+  useShareAllRecords,
+  useIsCommunitySyncing,
 } from '../store/useAppStore';
 import { formatSize, getStorageUsagePercentage, DEFAULT_STORAGE_QUOTA_MB } from '../utils/storageManager';
 import {
@@ -100,6 +114,13 @@ export default function SettingsPage() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showClearPhotosConfirm, setShowClearPhotosConfirm] = useState(false);
   const [showQuotaSettings, setShowQuotaSettings] = useState(false);
+  const [showShareAllConfirm, setShowShareAllConfirm] = useState(false);
+
+  const communitySettings = useCommunitySettings();
+  const updateCommunitySettings = useUpdateCommunitySettings();
+  const contributionStats = useContributionStats();
+  const shareAllRecords = useShareAllRecords();
+  const isCommunitySyncing = useIsCommunitySyncing();
 
   const quotaOptions = [50, 100, 200, 500, 1000];
   const currentQuotaMB = Math.round(storageInfo.quotaLimit / (1024 * 1024));
@@ -226,6 +247,35 @@ export default function SettingsPage() {
 
   const handleQuotaChange = (quotaMB: number) => {
     setStorageQuota(quotaMB);
+  };
+
+  const handleCommunityToggle = () => {
+    updateCommunitySettings({ enabled: !communitySettings.enabled });
+  };
+
+  const handleUseCommunityDataToggle = () => {
+    updateCommunitySettings({ useCommunityData: !communitySettings.useCommunityData });
+  };
+
+  const handleAutoShareToggle = () => {
+    updateCommunitySettings({ autoShare: !communitySettings.autoShare });
+  };
+
+  const handleShareNotesToggle = () => {
+    updateCommunitySettings({ shareNotes: !communitySettings.shareNotes });
+  };
+
+  const handleSharePhotosToggle = () => {
+    updateCommunitySettings({ sharePhotos: !communitySettings.sharePhotos });
+  };
+
+  const handleAnonymityLevelChange = (level: 'full' | 'partial' | 'none') => {
+    updateCommunitySettings({ anonymityLevel: level });
+  };
+
+  const handleShareAll = () => {
+    shareAllRecords();
+    setShowShareAllConfirm(false);
   };
 
   const toggleSwitchClass = (enabled: boolean) =>
@@ -847,6 +897,303 @@ export default function SettingsPage() {
                 去收藏路段
                 <ChevronRight className="w-4 h-4" />
               </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="w-5 h-5 text-purple-500" />
+            社区数据共享
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="font-medium text-slate-800">开启社区共享</p>
+                {contributionStats && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                    <Trophy className="w-3 h-3" />
+                    Lv.{contributionStats.level}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-slate-500 mt-0.5">
+                将您的洒水车记录匿名分享，获取更精准的预测
+              </p>
+            </div>
+            <button
+              onClick={handleCommunityToggle}
+              className={cn(
+                'relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2',
+                communitySettings.enabled ? 'bg-purple-500' : 'bg-slate-200'
+              )}
+              aria-pressed={communitySettings.enabled}
+            >
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                  communitySettings.enabled ? 'translate-x-5' : 'translate-x-0'
+                )}
+              />
+            </button>
+          </div>
+
+          <div className={cn(!communitySettings.enabled && 'opacity-50 pointer-events-none')}>
+            <p className="text-sm font-medium text-slate-700 mb-3">共享范围</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-sky-100 flex items-center justify-center">
+                    <Database className="w-4 h-4 text-sky-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">使用社区数据</p>
+                    <p className="text-xs text-slate-500">在预测中合并社区用户贡献的数据</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleUseCommunityDataToggle}
+                  className={toggleSwitchClass(communitySettings.useCommunityData)}
+                  aria-pressed={communitySettings.useCommunityData}
+                >
+                  <span aria-hidden="true" className={toggleDotClass(communitySettings.useCommunityData)} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                    <Share2 className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">自动分享新记录</p>
+                    <p className="text-xs text-slate-500">新增记录时自动上传到社区</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleAutoShareToggle}
+                  className={toggleSwitchClass(communitySettings.autoShare)}
+                  aria-pressed={communitySettings.autoShare}
+                >
+                  <span aria-hidden="true" className={toggleDotClass(communitySettings.autoShare)} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                    <FileText className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">分享备注内容</p>
+                    <p className="text-xs text-slate-500">包含您对记录的文字描述</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleShareNotesToggle}
+                  className={toggleSwitchClass(communitySettings.shareNotes)}
+                  aria-pressed={communitySettings.shareNotes}
+                >
+                  <span aria-hidden="true" className={toggleDotClass(communitySettings.shareNotes)} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center">
+                    <Camera className="w-4 h-4 text-rose-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">分享照片</p>
+                    <p className="text-xs text-slate-500">包含您拍摄的洒水车照片</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleSharePhotosToggle}
+                  className={toggleSwitchClass(communitySettings.sharePhotos)}
+                  aria-pressed={communitySettings.sharePhotos}
+                >
+                  <span aria-hidden="true" className={toggleDotClass(communitySettings.sharePhotos)} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className={cn(!communitySettings.enabled && 'opacity-50 pointer-events-none')}>
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldCheck className="w-4 h-4 text-slate-500" />
+              <p className="font-medium text-slate-700">匿名程度</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => handleAnonymityLevelChange('full')}
+                className={cn(
+                  'p-3 rounded-xl border-2 transition-all text-center',
+                  communitySettings.anonymityLevel === 'full'
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                )}
+              >
+                <div className={cn(
+                  'w-8 h-8 mx-auto rounded-lg flex items-center justify-center mb-2',
+                  communitySettings.anonymityLevel === 'full' ? 'bg-purple-500' : 'bg-slate-100'
+                )}>
+                  <UserX className={cn(
+                    'w-4 h-4',
+                    communitySettings.anonymityLevel === 'full' ? 'text-white' : 'text-slate-500'
+                  )} />
+                </div>
+                <p className={cn(
+                  'text-sm font-medium',
+                  communitySettings.anonymityLevel === 'full' ? 'text-purple-700' : 'text-slate-700'
+                )}>完全匿名</p>
+                <p className="text-xs text-slate-400 mt-0.5">无用户标识</p>
+              </button>
+
+              <button
+                onClick={() => handleAnonymityLevelChange('partial')}
+                className={cn(
+                  'p-3 rounded-xl border-2 transition-all text-center',
+                  communitySettings.anonymityLevel === 'partial'
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                )}
+              >
+                <div className={cn(
+                  'w-8 h-8 mx-auto rounded-lg flex items-center justify-center mb-2',
+                  communitySettings.anonymityLevel === 'partial' ? 'bg-purple-500' : 'bg-slate-100'
+                )}>
+                  <EyeOff className={cn(
+                    'w-4 h-4',
+                    communitySettings.anonymityLevel === 'partial' ? 'text-white' : 'text-slate-500'
+                  )} />
+                </div>
+                <p className={cn(
+                  'text-sm font-medium',
+                  communitySettings.anonymityLevel === 'partial' ? 'text-purple-700' : 'text-slate-700'
+                )}>部分匿名</p>
+                <p className="text-xs text-slate-400 mt-0.5">随机ID</p>
+              </button>
+
+              <button
+                onClick={() => handleAnonymityLevelChange('none')}
+                className={cn(
+                  'p-3 rounded-xl border-2 transition-all text-center',
+                  communitySettings.anonymityLevel === 'none'
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                )}
+              >
+                <div className={cn(
+                  'w-8 h-8 mx-auto rounded-lg flex items-center justify-center mb-2',
+                  communitySettings.anonymityLevel === 'none' ? 'bg-purple-500' : 'bg-slate-100'
+                )}>
+                  <Users className={cn(
+                    'w-4 h-4',
+                    communitySettings.anonymityLevel === 'none' ? 'text-white' : 'text-slate-500'
+                  )} />
+                </div>
+                <p className={cn(
+                  'text-sm font-medium',
+                  communitySettings.anonymityLevel === 'none' ? 'text-purple-700' : 'text-slate-700'
+                )}>实名贡献</p>
+                <p className="text-xs text-slate-400 mt-0.5">显示昵称</p>
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+              <Info className="w-3 h-3" />
+              您的个人信息和精确位置永远不会被共享
+            </p>
+          </div>
+
+          {contributionStats && (
+            <div className={cn(
+              'pt-4 border-t border-slate-100',
+              !communitySettings.enabled && 'opacity-50 pointer-events-none'
+            )}>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="font-medium text-slate-800">我的贡献</p>
+                  <p className="text-sm text-slate-500 mt-0.5">
+                    已贡献 <span className="text-purple-600 font-medium">{contributionStats.totalContributed}</span> 条记录，
+                    覆盖 <span className="text-purple-600 font-medium">{contributionStats.roadsContributed}</span> 条路段
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigate('/community')}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-50 text-purple-600 text-sm font-medium hover:bg-purple-100 transition-colors"
+                >
+                  <Globe className="w-4 h-4" />
+                  查看社区
+                </button>
+              </div>
+
+              {showShareAllConfirm ? (
+                <div className="p-4 rounded-xl bg-purple-50 border border-purple-200">
+                  <div className="flex items-start gap-3 mb-3">
+                    <AlertTriangle className="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-purple-800">确认分享所有记录？</p>
+                      <p className="text-sm text-purple-600 mt-1">
+                        将把您所有未分享的本地记录提交到社区数据库
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleShareAll}
+                      className="flex-1 bg-purple-500 text-white hover:bg-purple-600 border-purple-500"
+                      disabled={isCommunitySyncing}
+                    >
+                      {isCommunitySyncing ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          分享中...
+                        </>
+                      ) : (
+                        <>
+                          <Share2 className="w-4 h-4" />
+                          确认分享
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowShareAllConfirm(false)}
+                      className="flex-1"
+                    >
+                      取消
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowShareAllConfirm(true)}
+                  className="w-full"
+                  disabled={isCommunitySyncing}
+                >
+                  {isCommunitySyncing ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      正在同步...
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="w-4 h-4" />
+                      一键分享所有记录
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           )}
         </CardContent>

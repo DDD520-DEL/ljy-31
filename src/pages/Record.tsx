@@ -131,8 +131,9 @@ export default function Record() {
           dayOfWeek: getDayOfWeek(timestamp),
           road: road.trim(),
           isSplashed,
-          direction: (direction as 'east' | 'west' | 'south' | 'north') || undefined,
-          note: note.trim() || undefined,
+          direction: (direction as 'east' | 'west' | 'south' | 'north') || 'east',
+          note: note.trim() || '',
+          dataSource: 'local' as const,
         };
         addRecord(newRecord);
         const recordsNow = useAppStore.getState().records;

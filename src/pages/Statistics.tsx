@@ -29,6 +29,9 @@ import {
   Layers,
   Shield,
   Route,
+  Globe,
+  User,
+  Clock,
 } from 'lucide-react';
 import {
   useStatistics,
@@ -40,6 +43,9 @@ import {
   useIsGeneratingReport,
   useExportRecordsCSV,
   useSettings,
+  useCommunityRecords,
+  useCommunitySettings,
+  useGetMergedRecords,
 } from '../store/useAppStore';
 import { useScrollToSection, useClearNavigationParams } from '../store/useSearchStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
@@ -67,6 +73,9 @@ export default function Statistics() {
   const isGeneratingReport = useIsGeneratingReport();
   const exportRecordsCSV = useExportRecordsCSV();
   const settings = useSettings();
+  const communityRecords = useCommunityRecords();
+  const communitySettings = useCommunitySettings();
+  const getMergedRecords = useGetMergedRecords();
   const getWeatherAdjustment = useGetWeatherAdjustment();
   const scrollToSection = useScrollToSection();
   const clearNavigationParams = useClearNavigationParams();
@@ -189,6 +198,41 @@ export default function Statistics() {
       溅水率: Math.round(item.splashRate * 100),
     }));
   }, [filteredStatistics]);
+
+  const communityStats = useMemo(() => {
+    if (!communitySettings.enabled || communityRecords.length === 0) return null;
+    const stats = generateStatistics(communityRecords);
+    return {
+      totalRecords: stats.totalRecords,
+      totalSplashed: stats.totalSplashed,
+      splashRate: stats.splashRate,
+    };
+  }, [communityRecords, communitySettings.enabled]);
+
+  const comparisonHourlyData = useMemo(() => {
+    if (!filteredStatistics || !communitySettings.enabled) return [];
+    const communityStats = generateStatistics(communityRecords);
+    return filteredStatistics.recordsByHour.map((item, idx) => ({
+      hour: `${String(item.hour).padStart(2, '0')}`,
+      个人数据: item.count,
+      社区数据: communityStats.recordsByHour[idx]?.count || 0,
+    }));
+  }, [filteredStatistics, communityRecords, communitySettings.enabled]);
+
+  const comparisonTopRoads = useMemo(() => {
+    if (!filteredStatistics || !communitySettings.enabled) return [];
+    const communityStats = generateStatistics(communityRecords);
+    const localTopRoads = filteredStatistics.topRoads.slice(0, 5);
+    return localTopRoads.map((item) => {
+      const communityRoad = communityStats.topRoads.find((r) => r.road === item.road);
+      return {
+        road: item.road.length > 5 ? item.road.slice(0, 5) + '...' : item.road,
+        fullRoad: item.road,
+        个人记录: item.count,
+        社区记录: communityRoad?.count || 0,
+      };
+    });
+  }, [filteredStatistics, communityRecords, communitySettings.enabled]);
 
   if (!statistics) {
     return (
@@ -594,6 +638,174 @@ export default function Statistics() {
                 </p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {communitySettings.enabled && communityStats && (
+        <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50/50 to-sky-50/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="w-5 h-5 text-purple-500" />
+              个人数据 vs 社区数据 对比
+            </CardTitle>
+            <p className="text-sm text-slate-500 mt-1">
+              对比您的记录与社区用户贡献的聚合数据
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center p-4 bg-white/80 rounded-xl border border-slate-100">
+                <p className="text-xs text-slate-500 mb-2">指标</p>
+              </div>
+              <div className="text-center p-4 bg-sky-50 rounded-xl border border-sky-200">
+                <div className="flex items-center justify-center gap-1 mb-2">
+                  <User className="w-4 h-4 text-sky-500" />
+                  <p className="text-xs font-medium text-sky-700">个人数据</p>
+                </div>
+                <p className="text-xs text-slate-400">{allRecords.length} 条记录</p>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-xl border border-purple-200">
+                <div className="flex items-center justify-center gap-1 mb-2">
+                  <Globe className="w-4 h-4 text-purple-500" />
+                  <p className="text-xs font-medium text-purple-700">社区数据</p>
+                </div>
+                <p className="text-xs text-slate-400">{communityStats.totalRecords} 条记录</p>
+              </div>
+
+              <div className="flex items-center justify-center p-4 bg-white/80 rounded-xl border border-slate-100">
+                <p className="text-sm font-medium text-slate-700">总记录数</p>
+              </div>
+              <div className="text-center p-4 bg-white rounded-xl border border-sky-100">
+                <p className="text-2xl font-bold text-sky-600">{allRecords.length}</p>
+              </div>
+              <div className="text-center p-4 bg-white rounded-xl border border-purple-100">
+                <p className="text-2xl font-bold text-purple-600">{communityStats.totalRecords}</p>
+              </div>
+
+              <div className="flex items-center justify-center p-4 bg-white/80 rounded-xl border border-slate-100">
+                <p className="text-sm font-medium text-slate-700">被溅次数</p>
+              </div>
+              <div className="text-center p-4 bg-white rounded-xl border border-sky-100">
+                <p className="text-2xl font-bold text-orange-600">{statistics?.totalSplashed || 0}</p>
+              </div>
+              <div className="text-center p-4 bg-white rounded-xl border border-purple-100">
+                <p className="text-2xl font-bold text-orange-600">{communityStats.totalSplashed}</p>
+              </div>
+
+              <div className="flex items-center justify-center p-4 bg-white/80 rounded-xl border border-slate-100">
+                <p className="text-sm font-medium text-slate-700">溅水率</p>
+              </div>
+              <div className="text-center p-4 bg-white rounded-xl border border-sky-100">
+                <p className="text-2xl font-bold text-sky-600">
+                  {Math.round((statistics?.splashRate || 0) * 100)}%
+                </p>
+                {statistics && communityStats && statistics.splashRate !== communityStats.splashRate && (
+                  <p className={cn(
+                    'text-xs mt-1 font-medium',
+                    statistics.splashRate > communityStats.splashRate ? 'text-red-500' : 'text-emerald-500'
+                  )}>
+                    {statistics.splashRate > communityStats.splashRate ? '↑' : '↓'}
+                    {Math.abs(Math.round((statistics.splashRate - communityStats.splashRate) * 100))}%
+                  </p>
+                )}
+              </div>
+              <div className="text-center p-4 bg-white rounded-xl border border-purple-100">
+                <p className="text-2xl font-bold text-purple-600">
+                  {Math.round(communityStats.splashRate * 100)}%
+                </p>
+              </div>
+            </div>
+
+            {comparisonHourlyData.length > 0 && (
+              <div className="pt-3 border-t border-purple-100">
+                <p className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-purple-500" />
+                  24小时出没分布对比
+                </p>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={comparisonHourlyData}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis
+                        dataKey="hour"
+                        tick={{ fontSize: 10, fill: '#64748b' }}
+                        tickLine={false}
+                        axisLine={{ stroke: '#e2e8f0' }}
+                        interval={3}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11, fill: '#64748b' }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '12px',
+                          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                        }}
+                      />
+                      <Bar dataKey="个人数据" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="社区数据" fill="#a855f7" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {comparisonTopRoads.length > 0 && (
+              <div className="pt-3 border-t border-purple-100">
+                <p className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-purple-500" />
+                  热门路段记录数对比
+                </p>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={comparisonTopRoads}
+                      layout="vertical"
+                      margin={{ top: 5, right: 30, left: 60, bottom: 5 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#e2e8f0"
+                        horizontal={true}
+                        vertical={false}
+                      />
+                      <XAxis
+                        type="number"
+                        tick={{ fontSize: 11, fill: '#64748b' }}
+                        tickLine={false}
+                        axisLine={{ stroke: '#e2e8f0' }}
+                      />
+                      <YAxis
+                        dataKey="road"
+                        type="category"
+                        tick={{ fontSize: 11, fill: '#475569' }}
+                        tickLine={false}
+                        axisLine={false}
+                        width={60}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '12px',
+                          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                        }}
+                      />
+                      <Bar dataKey="个人记录" fill="#0ea5e9" radius={[0, 6, 6, 0]} />
+                      <Bar dataKey="社区记录" fill="#a855f7" radius={[0, 6, 6, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

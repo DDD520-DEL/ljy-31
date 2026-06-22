@@ -13,10 +13,6 @@ export const formatTime = (timestamp: number): string => {
   return `${hours}:${minutes}`;
 };
 
-export const formatDateTime = (timestamp: number): string => {
-  return `${formatDate(timestamp)} ${formatTime(timestamp)}`;
-};
-
 export const formatTimeFromParts = (hour: number, minute: number): string => {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 };
@@ -110,4 +106,21 @@ export const getRecentDays = (days: number): string[] => {
 
 export const clamp = (value: number, min: number, max: number): number => {
   return Math.min(Math.max(value, min), max);
+};
+
+export const formatDateTime = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+
+  if (isToday) {
+    return `今天 ${formatTime(timestamp)}`;
+  }
+  if (isYesterday) {
+    return `昨天 ${formatTime(timestamp)}`;
+  }
+  return `${formatDate(timestamp)} ${formatTime(timestamp)}`;
 };

@@ -1,3 +1,5 @@
+export type DataSource = 'local' | 'community';
+
 export interface Photo {
   id: string;
   recordId: string;
@@ -47,6 +49,8 @@ export interface SprinklerRecord {
   photos?: Photo[];
   createdAt: number;
   updatedAt: number;
+  dataSource: DataSource;
+  contributorId?: string;
 }
 
 export interface PredictedTime {
@@ -65,6 +69,8 @@ export interface RoadPrediction {
   predictedTimes: PredictedTime[];
   hourlyDistribution: Record<number, number>;
   lastUpdated: number;
+  localRecordCount: number;
+  communityRecordCount: number;
 }
 
 export interface StatisticsData {
@@ -156,6 +162,20 @@ export interface WeeklyReportSettings {
   bannerDismissed: Record<string, boolean>;
 }
 
+export type AnonymityLevel = 'full' | 'partial' | 'none';
+
+export interface CommunitySettings {
+  enabled: boolean;
+  anonymityLevel: AnonymityLevel;
+  autoShare: boolean;
+  shareNotes: boolean;
+  sharePhotos: boolean;
+  useCommunityData: boolean;
+  contributorId: string;
+  lastSyncAt: number | null;
+  contributedCount: number;
+}
+
 export interface AppSettings {
   theme: 'light' | 'dark';
   reminderEnabled: boolean;
@@ -163,6 +183,26 @@ export interface AppSettings {
   favoriteRoads: string[];
   weatherNotificationEnabled: boolean;
   weeklyReport: WeeklyReportSettings;
+  community: CommunitySettings;
+}
+
+export interface CommunityRoadStats {
+  roadName: string;
+  totalRecords: number;
+  splashCount: number;
+  splashRate: number;
+  contributorCount: number;
+  lastContributionAt: number;
+  rank: number;
+}
+
+export interface ContributionStats {
+  totalContributed: number;
+  roadsContributed: number;
+  firstContributionAt: number | null;
+  lastContributionAt: number | null;
+  weeklyContributions: Array<{ week: string; count: number }>;
+  level: number;
 }
 
 export type NotificationType = 'road_reminder' | 'weather_alert' | 'weekly_report' | 'system';
@@ -218,6 +258,8 @@ export enum StorageKeys {
   SEARCH_HISTORY = 'sprinkler_search_history',
   PHOTOS = 'sprinkler_photos',
   STORAGE_QUOTA = 'sprinkler_storage_quota',
+  COMMUNITY_RECORDS = 'sprinkler_community_records',
+  COMMUNITY_SYNCED_IDS = 'sprinkler_community_synced_ids',
 }
 
 export type SearchResultType = 'road' | 'record' | 'statistic';
@@ -339,8 +381,11 @@ export interface HeatmapRoadData {
 
 export interface AppState {
   records: SprinklerRecord[];
+  communityRecords: SprinklerRecord[];
   predictions: RoadPrediction[];
   statistics: StatisticsData | null;
+  communityRoadStats: CommunityRoadStats[];
+  contributionStats: ContributionStats;
   settings: AppSettings;
   weather: WeatherData | null;
   weeklyReports: WeeklyReport[];
@@ -348,6 +393,7 @@ export interface AppState {
   isLoading: boolean;
   isWeatherLoading: boolean;
   isGeneratingReport: boolean;
+  isCommunitySyncing: boolean;
   photos: Photo[];
   storageInfo: StorageInfo;
   addRecord: (record: Omit<SprinklerRecord, 'id' | 'createdAt' | 'updatedAt'>) => void;
@@ -373,4 +419,12 @@ export interface AppState {
   refreshStorageInfo: () => void;
   setStorageQuota: (quotaMB: number) => void;
   clearAllPhotos: () => void;
+  shareRecordToCommunity: (recordId: string) => Promise<boolean>;
+  shareMultipleRecords: (recordIds: string[]) => Promise<number>;
+  shareAllRecords: () => Promise<number>;
+  syncCommunityData: () => Promise<void>;
+  updateCommunitySettings: (settings: Partial<CommunitySettings>) => void;
+  refreshCommunityRoadStats: () => void;
+  refreshContributionStats: () => void;
+  getMergedRecords: () => SprinklerRecord[];
 }

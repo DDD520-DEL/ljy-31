@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Search, MapPin, Droplets, Clock, Filter, CloudRain, Star, Info, Route, Shield, ChevronRight } from 'lucide-react';
-import { usePredictions, useWeather, useGetWeatherAdjustment, useRefreshWeather, useIsWeatherLoading, useSettings } from '../store/useAppStore';
+import { Search, MapPin, Droplets, Clock, Filter, CloudRain, Star, Info, Route, Shield, ChevronRight, Globe, User } from 'lucide-react';
+import { usePredictions, useWeather, useGetWeatherAdjustment, useRefreshWeather, useIsWeatherLoading, useSettings, useCommunitySettings } from '../store/useAppStore';
 import { useExpandRoad, useClearNavigationParams } from '../store/useSearchStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import PredictionCard from '../components/PredictionCard';
@@ -20,6 +20,7 @@ export default function Schedule() {
   const refreshWeather = useRefreshWeather();
   const isWeatherLoading = useIsWeatherLoading();
   const settings = useSettings();
+  const communitySettings = useCommunitySettings();
   const expandRoadFromSearch = useExpandRoad();
   const clearNavigationParams = useClearNavigationParams();
   const location = useLocation();
@@ -252,6 +253,22 @@ export default function Schedule() {
                       <div>
                         <p className="text-2xl font-bold text-slate-800">{prediction.recordCount}</p>
                         <p className="text-xs text-slate-500">总记录数</p>
+                        {communitySettings.enabled && communitySettings.useCommunityData && (prediction.localRecordCount > 0 || prediction.communityRecordCount > 0) && (
+                          <div className="flex items-center justify-center gap-2 mt-1">
+                            {prediction.localRecordCount > 0 && (
+                              <span className="inline-flex items-center gap-0.5 text-xs text-sky-600">
+                                <User className="w-3 h-3" />
+                                {prediction.localRecordCount}
+                              </span>
+                            )}
+                            {prediction.communityRecordCount > 0 && (
+                              <span className="inline-flex items-center gap-0.5 text-xs text-purple-600">
+                                <Globe className="w-3 h-3" />
+                                {prediction.communityRecordCount}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <p className="text-2xl font-bold text-orange-600">{prediction.splashCount}</p>
@@ -279,6 +296,15 @@ export default function Schedule() {
                         </p>
                       </div>
                     </div>
+
+                    {communitySettings.enabled && communitySettings.useCommunityData && prediction.communityRecordCount > 0 && (
+                      <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg border border-purple-100">
+                        <Globe className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                        <p className="text-xs text-purple-700">
+                          该路段包含 <span className="font-medium">{prediction.communityRecordCount}</span> 条社区用户贡献的数据，预测更精准
+                        </p>
+                      </div>
+                    )}
 
                     <div className="space-y-3">
                       <p className="text-sm font-medium text-slate-700 flex items-center gap-2">
