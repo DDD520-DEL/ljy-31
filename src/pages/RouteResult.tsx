@@ -30,19 +30,29 @@ export default function RouteResult() {
   const weather = useWeather();
   const getWeatherAdjustment = useGetWeatherAdjustment();
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
-  const [isCalculating, setIsCalculating] = useState(true);
+  const [isCalculating, setIsCalculating] = useState(false);
 
   const searchParams = new URLSearchParams(location.search);
-  const origin = searchParams.get('origin') || '';
-  const destination = searchParams.get('destination') || '';
+  const urlOrigin = searchParams.get('origin') || '';
+  const urlDestination = searchParams.get('destination') || '';
+  const focusRoad = searchParams.get('focusRoad') || '';
   const departureTime = searchParams.get('departureTime') || '';
 
+  const [originInput, setOriginInput] = useState(urlOrigin);
+  const [destinationInput, setDestinationInput] = useState(urlDestination);
+  const [calculatedOrigin, setCalculatedOrigin] = useState('');
+  const [calculatedDestination, setCalculatedDestination] = useState('');
+
   const routeResult = useMemo(() => {
-    if (!origin || !destination) return null;
+    if (!calculatedOrigin || !calculatedDestination) return null;
 
     const weatherAdjFn = (prob: number) => getWeatherAdjustment(prob).adjustedProbability;
-    return calculateRouteAvoidance(predictions, { origin, destination, departureTime }, weatherAdjFn);
-  }, [predictions, origin, destination, departureTime, getWeatherAdjustment]);
+    return calculateRouteAvoidance(
+      predictions,
+      { origin: calculatedOrigin, destination: calculatedDestination, departureTime },
+      weatherAdjFn
+    );
+  }, [predictions, calculatedOrigin, calculatedDestination, departureTime, getWeatherAdjustment]);
 
   useEffect(() => {
     if (routeResult) {
@@ -50,6 +60,30 @@ export default function RouteResult() {
       setSelectedRouteId(routeResult.bestRouteId);
     }
   }, [routeResult]);
+
+  const handleCalculateRoute = () => {
+    if (!originInput.trim() || !destinationInput.trim()) return;
+    setIsCalculating(true);
+    setCalculatedOrigin(originInput.trim());
+    setCalculatedDestination(destinationInput.trim());
+
+    const params = new URLSearchParams();
+    params.set('origin', originInput.trim());
+    params.set('destination', destinationInput.trim());
+    if (departureTime) params.set('departureTime', departureTime);
+    navigate(`/route?${params.toString()}`, { replace: true });
+  };
+
+  const hasResult = calculatedOrigin && calculatedDestination;
+
+  useEffect(() => {
+    if (urlOrigin && urlDestination && !hasResult) {
+      setOriginInput(urlOrigin);
+      setDestinationInput(urlDestination);
+      setCalculatedOrigin(urlOrigin);
+      setCalculatedDestination(urlDestination);
+    }
+  }, [urlOrigin, urlDestination, hasResult]);
 
   const selectedRoute = routeResult?.routes.find((r) => r.id === selectedRouteId);
 
@@ -84,39 +118,6 @@ export default function RouteResult() {
     }
   };
 
-  if (!origin || !destination) {
-    return (
-      <div className="p-4">
-        <Card>
-          <CardContent className="text-center py-12">
-            <div className="w-20 h-20 mx-auto rounded-full bg-slate-100 flex items-center justify-center mb-4">
-              <Route className="w-10 h-10 text-slate-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">未找到路线信息</h3>
-            <p className="text-slate-500 text-sm mb-6">请返回首页输入出发地和目的地</p>
-            <button
-              onClick={() => navigate('/')}
-              className="px-6 py-2.5 bg-sky-500 text-white rounded-xl font-medium hover:bg-sky-600 transition-colors"
-            >
-              返回首页
-            </button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (isCalculating || !routeResult) {
-    return (
-      <div className="p-4 flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <div className="animate-spin w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full mx-auto mb-4" />
-          <p className="text-slate-500">正在计算最优路线...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-4 space-y-6 pb-8">
       <div className="flex items-center gap-2 pt-2">
@@ -128,40 +129,110 @@ export default function RouteResult() {
         </button>
         <div>
           <h1 className="text-2xl font-bold text-slate-800">路线规避建议</h1>
-          <p className="text-slate-500 text-sm">
-            {origin} <ArrowRight className="w-3 h-3 inline mx-1" /> {destination}
-          </p>
+          {focusRoad && (
+            <p className="text-sm text-emerald-600">从「{focusRoad}」出发，规避高风险路段</p>
+          )}
         </div>
       </div>
 
-      <Card className="bg-gradient-to-r from-sky-500 to-blue-600 text-white border-0 overflow-hidden">
-        <CardContent className="py-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-                <Navigation className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-medium">{origin}</span>
-                  <ArrowRight className="w-4 h-4 text-sky-200" />
-                  <span className="font-medium">{destination}</span>
-                </div>
-                <p className="text-sm text-sky-100">
-                  共 {routeResult.routes.length} 条路线可选
-                </p>
-              </div>
+      <Card className="bg-white">
+        <CardContent className="py-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+              <MapPin className="w-4 h-4 text-emerald-600" />
             </div>
-            <button
-              onClick={() => {
-                setIsCalculating(true);
-                setTimeout(() => setIsCalculating(false), 500);
-              }}
-              className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-            >
-              <RefreshCw className="w-5 h-5" />
-            </button>
+            <input
+              type="text"
+              value={originInput}
+              onChange={(e) => setOriginInput(e.target.value)}
+              placeholder="出发地..."
+              className="flex-1 px-3 py-2 rounded-lg border border-slate-200 bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none text-sm text-slate-800 placeholder-slate-400"
+            />
           </div>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+              <MapPin className="w-4 h-4 text-red-600" />
+            </div>
+            <input
+              type="text"
+              value={destinationInput}
+              onChange={(e) => setDestinationInput(e.target.value)}
+              placeholder="目的地..."
+              className="flex-1 px-3 py-2 rounded-lg border border-slate-200 bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none text-sm text-slate-800 placeholder-slate-400"
+            />
+          </div>
+          <button
+            onClick={handleCalculateRoute}
+            disabled={!originInput.trim() || !destinationInput.trim() || isCalculating}
+            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+          >
+            {isCalculating ? (
+              <><RefreshCw className="w-4 h-4 animate-spin" /> 计算中...</>
+            ) : (
+              <><Navigation className="w-4 h-4" /> {hasResult ? '重新规划路线' : '规划安全路线'}</>
+            )}
+          </button>
+        </CardContent>
+      </Card>
+
+      {isCalculating && (
+        <div className="flex items-center justify-center py-8">
+          <div className="text-center">
+            <div className="animate-spin w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full mx-auto mb-4" />
+            <p className="text-slate-500">正在计算最优路线...</p>
+          </div>
+        </div>
+      )}
+
+      {!hasResult && !isCalculating && (
+        <Card>
+          <CardContent className="text-center py-12">
+            <div className="w-20 h-20 mx-auto rounded-full bg-slate-100 flex items-center justify-center mb-4">
+              <Route className="w-10 h-10 text-slate-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-800 mb-2">
+              {focusRoad ? '请输入目的地' : '请输入出发地和目的地'}
+            </h3>
+            <p className="text-slate-500 text-sm mb-4">
+              {focusRoad 
+                ? `已将「${focusRoad}」设为出发地，请在上方输入您的目的地`
+                : '请在上方输入出发地和目的地，系统将为您规划避开高风险路段的出行路线'
+              }
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {hasResult && routeResult && !isCalculating && (
+        <>
+          <Card className="bg-gradient-to-r from-sky-500 to-blue-600 text-white border-0 overflow-hidden">
+            <CardContent className="py-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                    <Navigation className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium">{calculatedOrigin}</span>
+                      <ArrowRight className="w-4 h-4 text-sky-200" />
+                      <span className="font-medium">{calculatedDestination}</span>
+                    </div>
+                    <p className="text-sm text-sky-100">
+                      共 {routeResult.routes.length} 条路线可选
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsCalculating(true);
+                    setTimeout(() => setIsCalculating(false), 500);
+                  }}
+                  className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                >
+                  <RefreshCw className="w-5 h-5" />
+                </button>
+              </div>
 
           {safeDeparture && (
             <div className="mt-4 pt-4 border-t border-white/20">
@@ -310,6 +381,8 @@ export default function RouteResult() {
           </div>
         </CardContent>
       </Card>
+        </>
+      )}
     </div>
   );
 }

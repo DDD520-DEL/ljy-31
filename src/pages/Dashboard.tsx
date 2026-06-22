@@ -187,14 +187,12 @@ export default function Dashboard() {
             </div>
             <button
               onClick={() => {
-                if (origin.trim() && destination.trim()) {
-                  const params = new URLSearchParams();
-                  params.set('origin', origin.trim());
-                  params.set('destination', destination.trim());
-                  navigate(`/route?${params.toString()}`);
-                }
+                const params = new URLSearchParams();
+                if (origin.trim()) params.set('origin', origin.trim());
+                if (destination.trim()) params.set('destination', destination.trim());
+                navigate(`/route?${params.toString()}`);
               }}
-              disabled={!origin.trim() || !destination.trim()}
+              disabled={false}
               className="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
             >
               <Navigation className="w-4 h-4" />

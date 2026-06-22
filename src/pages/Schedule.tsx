@@ -367,7 +367,7 @@ export default function Schedule() {
                           onClick={() => {
                             const params = new URLSearchParams();
                             params.set('origin', prediction.roadName);
-                            params.set('destination', '目的地');
+                            params.set('focusRoad', prediction.roadName);
                             navigate(`/route?${params.toString()}`);
                           }}
                           className="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 hover:border-emerald-300 transition-all hover:shadow-sm"
@@ -378,7 +378,7 @@ export default function Schedule() {
                             </div>
                             <div className="text-left">
                               <p className="text-sm font-medium text-emerald-800">可规避</p>
-                              <p className="text-xs text-emerald-600">查看该路段风险较高，规划安全出行建议</p>
+                              <p className="text-xs text-emerald-600">以该路段为起点，规划安全出行路线</p>
                             </div>
                           </div>
                           <ChevronRight className="w-5 h-5 text-emerald-500" />
