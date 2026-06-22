@@ -1,6 +1,36 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Settings as SettingsIcon, Edit3, Check, X, Grid3X3 } from 'lucide-react';
+import {
+  Plus,
+  Settings as SettingsIcon,
+  Edit3,
+  Check,
+  X,
+  Grid3X3,
+  Trophy,
+  Sparkles,
+  ChevronRight,
+  Award,
+  Droplets,
+  Flame,
+  MapPin,
+  FileText,
+  BookOpen,
+  Star,
+  Crown,
+  Calendar,
+  Zap,
+  TrendingUp,
+  Rocket,
+  CalendarCheck,
+  Map,
+  Compass,
+  Globe,
+  Droplet,
+  CloudRain,
+  Shield,
+  ShieldCheck,
+} from 'lucide-react';
 import VoiceInputButton from '../components/VoiceInputButton';
 import DraggableCardGrid from '../components/DraggableCardGrid';
 import CardSelector from '../components/CardSelector';
@@ -12,7 +42,14 @@ import {
 } from '../store/useDashboardStore';
 import {
   useCheckAndGenerateWeeklyReport as useCheckAndGenerate,
+  useNewAchievements,
+  useAchievements,
+  useMarkAchievementAsRead,
+  useUserAchievements,
+  useCheckAchievements,
 } from '../store/useAppStore';
+import { cn } from '../lib/utils';
+import { AchievementRarity } from '../types';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -20,7 +57,51 @@ export default function Dashboard() {
   const isEditing = useIsDashboardEditing();
   const setIsEditing = useSetIsDashboardEditing();
   const checkAndGenerateWeeklyReport = useCheckAndGenerate();
+  const newAchievements = useNewAchievements();
+  const allAchievements = useAchievements();
+  const userAchievements = useUserAchievements();
+  const markAchievementAsRead = useMarkAchievementAsRead();
+  const checkAchievements = useCheckAchievements();
   const [showCardSelector, setShowCardSelector] = useState(false);
+
+  const iconMap: Record<string, React.FC<{ className?: string }>> = {
+    Droplets,
+    Droplet,
+    CloudRain,
+    Award,
+    Crown,
+    Trophy,
+    Star,
+    Flame,
+    MapPin,
+    Map,
+    Compass,
+    Globe,
+    Calendar,
+    CalendarCheck,
+    Zap,
+    TrendingUp,
+    Rocket,
+    FileText,
+    BookOpen,
+    Shield,
+    ShieldCheck,
+  };
+
+  const rarityConfig: Record<AchievementRarity, { bg: string; text: string; border: string }> = {
+    common: { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' },
+    rare: { bg: 'bg-sky-100', text: 'text-sky-600', border: 'border-sky-200' },
+    epic: { bg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200' },
+    legendary: { bg: 'bg-amber-100', text: 'text-amber-600', border: 'border-amber-200' },
+  };
+
+  const newAchievementDetails = newAchievements
+    .map((na) => {
+      const achievement = allAchievements.find((a) => a.id === na.achievementId);
+      return achievement ? { ...achievement, unlockedAt: na.unlockedAt, isNew: na.isNew } : null;
+    })
+    .filter(Boolean)
+    .slice(0, 3);
 
   const handleVoiceRecord = (result: ParsedSpeechResult) => {
     sessionStorage.setItem('voiceRecordData', JSON.stringify(result));
@@ -29,7 +110,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     checkAndGenerateWeeklyReport();
-  }, [checkAndGenerateWeeklyReport]);
+    checkAchievements();
+  }, [checkAndGenerateWeeklyReport, checkAchievements]);
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -58,6 +140,17 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => navigate('/achievements')}
+            className="relative w-12 h-12 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            <Trophy className="w-5 h-5" />
+            {newAchievements.length > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-xs font-bold flex items-center justify-center">
+                {newAchievements.length > 9 ? '9+' : newAchievements.length}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => navigate('/settings')}
             className="w-12 h-12 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors"
           >
@@ -72,6 +165,64 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {newAchievementDetails.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 rounded-2xl p-4 border border-amber-200 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="font-bold text-slate-800 text-sm">恭喜获得新徽章！</p>
+                <p className="text-xs text-amber-700">
+                  解锁了 {newAchievements.length} 个新成就
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/achievements')}
+              className="flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-700 transition-colors"
+            >
+              查看全部
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="flex gap-3">
+            {newAchievementDetails.map((achievement) => {
+              if (!achievement) return null;
+              const Icon = iconMap[achievement.icon] || Award;
+              const rarity = rarityConfig[achievement.rarity];
+              return (
+                <div
+                  key={achievement.id}
+                  onClick={() => {
+                    markAchievementAsRead(achievement.id);
+                    navigate('/achievements');
+                  }}
+                  className={cn(
+                    'flex-1 flex flex-col items-center p-3 rounded-xl border-2 cursor-pointer transition-all hover:scale-105',
+                    rarity.border,
+                    rarity.bg,
+                    'shadow-md'
+                  )}
+                >
+                  <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center mb-2', rarity.bg)}>
+                    <Icon className={cn('w-5 h-5', rarity.text)} />
+                  </div>
+                  <p className={cn('text-xs font-bold text-center', rarity.text)}>
+                    {achievement.title}
+                  </p>
+                  <div className="flex items-center gap-0.5 mt-1">
+                    <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                    <span className="text-[10px] text-slate-500">新解锁</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

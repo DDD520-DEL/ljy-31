@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { Home, Plus, Clock, History, BarChart3, Bell, Globe, Calendar } from 'lucide-react';
+import { Home, Plus, Clock, History, BarChart3, Bell, Globe, Calendar, Trophy } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { NotificationPanel } from './NotificationPanel';
 import { NotificationToast } from './NotificationToast';
@@ -20,6 +20,7 @@ const navItems = [
   { to: '/schedule', label: '时刻表', icon: Clock },
   { to: '/record', label: '记录', icon: Plus },
   { to: '/calendar', label: '日历', icon: Calendar },
+  { to: '/achievements', label: '成就', icon: Trophy },
   { to: '/community', label: '社区', icon: Globe },
   { to: '/history', label: '历史', icon: History },
   { to: '/statistics', label: '统计', icon: BarChart3 },

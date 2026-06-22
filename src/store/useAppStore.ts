@@ -15,6 +15,9 @@ import {
   ContributionStats,
   CommunitySettings,
   RouteLibraryItem,
+  Achievement,
+  UserAchievement,
+  AchievementProgress,
 } from '../types';
 import { storage } from '../utils/storage';
 import {
@@ -32,6 +35,11 @@ import {
   setStorageQuota as setStorageQuotaFn,
 } from '../utils/storageManager';
 import { communityService } from '../services/community';
+import {
+  ACHIEVEMENTS,
+  calculateAchievementProgress,
+  findNewlyUnlockedAchievements,
+} from '../utils/achievements';
 
 const defaultWeeklyReportSettings: WeeklyReportSettings = {
   autoGenerate: true,
@@ -101,6 +109,10 @@ const getInitialRouteLibrary = (): RouteLibraryItem[] => {
   return storage.get<RouteLibraryItem[]>(StorageKeys.ROUTE_LIBRARY, []);
 };
 
+const getInitialUserAchievements = (): UserAchievement[] => {
+  return storage.get<UserAchievement[]>(StorageKeys.ACHIEVEMENTS, []);
+};
+
 const initialRecords = getInitialRecords();
 const initialSettings = getInitialSettings();
 const initialCommunityRecords = getInitialCommunityRecords(initialRecords);
@@ -123,6 +135,9 @@ const initialContributionStats = communityService.generateContributionStats(
   initialRecords,
   initialSettings.community
 );
+const initialUserAchievements = getInitialUserAchievements();
+const initialAchievementProgress = calculateAchievementProgress(initialRecords, ACHIEVEMENTS);
+const initialNewAchievements = initialUserAchievements.filter((a) => a.isNew);
 
 export const useAppStore = create<AppState>((set, get) => ({
   records: initialRecords,
@@ -142,6 +157,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   photos: initialPhotos,
   storageInfo: initialStorageInfo,
   routeLibrary: initialRouteLibrary,
+  achievements: ACHIEVEMENTS,
+  userAchievements: initialUserAchievements,
+  achievementProgress: initialAchievementProgress,
+  newAchievements: initialNewAchievements,
 
   addRecord: (recordData) => {
     const now = Date.now();
@@ -166,6 +185,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     get().refreshPredictions();
     get().refreshStatistics();
+    get().checkAchievements();
   },
 
   updateRecord: (id, updates) => {
@@ -654,6 +674,89 @@ export const useAppStore = create<AppState>((set, get) => ({
     const routeLibrary = getInitialRouteLibrary();
     set({ routeLibrary });
   },
+
+  checkAchievements: () => {
+    const { records, userAchievements, achievements } = get();
+    const progress = calculateAchievementProgress(records, achievements);
+    const newlyUnlocked = findNewlyUnlockedAchievements(progress, userAchievements);
+
+    if (newlyUnlocked.length === 0) {
+      set({ achievementProgress: progress });
+      return [];
+    }
+
+    const now = Date.now();
+    const newUserAchievements: UserAchievement[] = newlyUnlocked.map((a) => ({
+      achievementId: a.id,
+      unlockedAt: now,
+      isNew: true,
+    }));
+
+    const updatedUserAchievements = [...userAchievements, ...newUserAchievements];
+    storage.set(StorageKeys.ACHIEVEMENTS, updatedUserAchievements);
+
+    const updatedProgress = progress.map((p) => {
+      const userAch = updatedUserAchievements.find(
+        (ua) => ua.achievementId === p.achievementId
+      );
+      return {
+        ...p,
+        unlockedAt: userAch?.unlockedAt,
+      };
+    });
+
+    const newAchievementsList = updatedUserAchievements.filter((a) => a.isNew);
+
+    set({
+      userAchievements: updatedUserAchievements,
+      achievementProgress: updatedProgress,
+      newAchievements: newAchievementsList,
+    });
+
+    return newUserAchievements;
+  },
+
+  markAchievementAsRead: (achievementId: string) => {
+    set((state) => {
+      const updatedUserAchievements = state.userAchievements.map((ua) =>
+        ua.achievementId === achievementId ? { ...ua, isNew: false } : ua
+      );
+      storage.set(StorageKeys.ACHIEVEMENTS, updatedUserAchievements);
+      return {
+        userAchievements: updatedUserAchievements,
+        newAchievements: updatedUserAchievements.filter((a) => a.isNew),
+      };
+    });
+  },
+
+  markAllAchievementsAsRead: () => {
+    set((state) => {
+      const updatedUserAchievements = state.userAchievements.map((ua) => ({
+        ...ua,
+        isNew: false,
+      }));
+      storage.set(StorageKeys.ACHIEVEMENTS, updatedUserAchievements);
+      return {
+        userAchievements: updatedUserAchievements,
+        newAchievements: [],
+      };
+    });
+  },
+
+  refreshAchievementProgress: () => {
+    const { records, achievements, userAchievements } = get();
+    const progress = calculateAchievementProgress(records, achievements);
+    const progressWithUnlockTime = progress.map((p) => {
+      const userAch = userAchievements.find(
+        (ua) => ua.achievementId === p.achievementId
+      );
+      return {
+        ...p,
+        unlockedAt: userAch?.unlockedAt,
+      };
+    });
+    set({ achievementProgress: progressWithUnlockTime });
+  },
 }));
 
 export const useRecords = () => useAppStore((state) => state.records);
@@ -755,3 +858,12 @@ export const useUpdateRouteItem = () => useAppStore((state) => state.updateRoute
 export const useDeleteRouteItem = () => useAppStore((state) => state.deleteRouteItem);
 export const useGetRouteLibrary = () => useAppStore((state) => state.getRouteLibrary);
 export const useRefreshRouteLibrary = () => useAppStore((state) => state.refreshRouteLibrary);
+
+export const useAchievements = () => useAppStore((state) => state.achievements);
+export const useUserAchievements = () => useAppStore((state) => state.userAchievements);
+export const useAchievementProgress = () => useAppStore((state) => state.achievementProgress);
+export const useNewAchievements = () => useAppStore((state) => state.newAchievements);
+export const useCheckAchievements = () => useAppStore((state) => state.checkAchievements);
+export const useMarkAchievementAsRead = () => useAppStore((state) => state.markAchievementAsRead);
+export const useMarkAllAchievementsAsRead = () => useAppStore((state) => state.markAllAchievementsAsRead);
+export const useRefreshAchievementProgress = () => useAppStore((state) => state.refreshAchievementProgress);

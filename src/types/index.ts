@@ -262,6 +262,37 @@ export enum StorageKeys {
   COMMUNITY_SYNCED_IDS = 'sprinkler_community_synced_ids',
   ROUTE_LIBRARY = 'sprinkler_route_library',
   DASHBOARD_CARDS = 'sprinkler_dashboard_cards',
+  ACHIEVEMENTS = 'sprinkler_achievements',
+}
+
+export type AchievementCategory = 'record' | 'streak' | 'exploration' | 'milestone';
+
+export type AchievementRarity = 'common' | 'rare' | 'epic' | 'legendary';
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  category: AchievementCategory;
+  rarity: AchievementRarity;
+  targetValue: number;
+  unit: string;
+}
+
+export interface UserAchievement {
+  achievementId: string;
+  unlockedAt: number;
+  isNew: boolean;
+}
+
+export interface AchievementProgress {
+  achievementId: string;
+  currentValue: number;
+  targetValue: number;
+  percentage: number;
+  unlocked: boolean;
+  unlockedAt?: number;
 }
 
 export type WidgetType =
@@ -593,4 +624,13 @@ export interface AppState {
   refreshCommunityRoadStats: () => void;
   refreshContributionStats: () => void;
   getMergedRecords: () => SprinklerRecord[];
+
+  achievements: Achievement[];
+  userAchievements: UserAchievement[];
+  achievementProgress: AchievementProgress[];
+  newAchievements: UserAchievement[];
+  checkAchievements: () => UserAchievement[];
+  markAchievementAsRead: (achievementId: string) => void;
+  markAllAchievementsAsRead: () => void;
+  refreshAchievementProgress: () => void;
 }
