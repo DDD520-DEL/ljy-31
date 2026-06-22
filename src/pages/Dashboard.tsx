@@ -1,126 +1,35 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Droplets, Plus, Bell, AlertTriangle, ChevronRight, Star, Settings as SettingsIcon, CloudRain, Wind, Droplets as DropletsIcon, RefreshCw, FileText, X, TrendingUp, TrendingDown, Minus, Zap, MapPin, BarChart3, Route, Navigation, ArrowRight } from 'lucide-react';
-import { useTodayPredictions, useSplashStatistics, useRecentRecords, useUpcomingReminders } from '../hooks/usePredictions';
-import {
-  useSettings,
-  useFavoritePredictions,
-  useLatestWeeklyReport,
-  useCheckAndGenerateWeeklyReport,
-  useDismissWeeklyBanner,
-  useWeeklyReportSettings,
-} from '../store/useAppStore';
-import {
-  useNotifications,
-  useUnreadCount,
-  useMarkAsRead,
-  useSetShowNotificationPanel,
-} from '../store/useNotificationStore';
-import { NotificationType } from '../types';
-import { useWeatherData, useWeatherHint, useOverallWeatherRisk } from '../hooks/useWeather';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
-import { Button } from '../components/Button';
-import PredictionCard from '../components/PredictionCard';
-import RecordCard from '../components/RecordCard';
-import TimeAxis from '../components/TimeAxis';
-import WeeklyReportCard from '../components/WeeklyReportCard';
+import { Plus, Settings as SettingsIcon, Edit3, Check, X, Grid3X3 } from 'lucide-react';
 import VoiceInputButton from '../components/VoiceInputButton';
+import DraggableCardGrid from '../components/DraggableCardGrid';
+import CardSelector from '../components/CardSelector';
 import { ParsedSpeechResult } from '../utils/speechParser';
-import { getConfidenceLabel, getConfidenceColor } from '../utils/format';
-import { cn } from '../lib/utils';
+import {
+  useDashboardCards,
+  useIsDashboardEditing,
+  useSetIsDashboardEditing,
+} from '../store/useDashboardStore';
+import {
+  useCheckAndGenerateWeeklyReport as useCheckAndGenerate,
+} from '../store/useAppStore';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const todayPredictions = useTodayPredictions();
-  const splashStats = useSplashStatistics();
-  const recentRecords = useRecentRecords(3);
-  const settings = useSettings();
-  const favoritePredictions = useFavoritePredictions();
-  const upcomingReminders = useUpcomingReminders(settings.reminderMinutes);
-  const { weather, isWeatherLoading, refreshWeather } = useWeatherData();
-  const weatherHint = useWeatherHint();
-  const weatherRisk = useOverallWeatherRisk();
-  const latestReport = useLatestWeeklyReport();
-  const checkAndGenerateWeeklyReport = useCheckAndGenerateWeeklyReport();
-  const dismissWeeklyBanner = useDismissWeeklyBanner();
-  const weeklyReportSettings = useWeeklyReportSettings();
-  const [showReportDetail, setShowReportDetail] = useState(false);
-  const [origin, setOrigin] = useState('');
-  const [destination, setDestination] = useState('');
+  const cards = useDashboardCards();
+  const isEditing = useIsDashboardEditing();
+  const setIsEditing = useSetIsDashboardEditing();
+  const checkAndGenerateWeeklyReport = useCheckAndGenerate();
+  const [showCardSelector, setShowCardSelector] = useState(false);
 
   const handleVoiceRecord = (result: ParsedSpeechResult) => {
     sessionStorage.setItem('voiceRecordData', JSON.stringify(result));
     navigate('/record');
   };
 
-  const notifications = useNotifications();
-  const unreadCount = useUnreadCount();
-  const markAsRead = useMarkAsRead();
-  const setShowNotificationPanel = useSetShowNotificationPanel();
-
   useEffect(() => {
     checkAndGenerateWeeklyReport();
   }, [checkAndGenerateWeeklyReport]);
-
-  const shouldShowBanner =
-    latestReport && !weeklyReportSettings.bannerDismissed[latestReport.id];
-
-  const handleDismissBanner = () => {
-    if (latestReport) {
-      dismissWeeklyBanner(latestReport.id);
-    }
-  };
-
-  const handleViewReportDetail = () => {
-    navigate('/statistics');
-  };
-
-  const handleNotificationClick = (id: string) => {
-    markAsRead(id);
-  };
-
-  const handleViewAllNotifications = () => {
-    setShowNotificationPanel(true);
-  };
-
-  const getNotificationIcon = (type: NotificationType) => {
-    switch (type) {
-      case 'road_reminder':
-        return { icon: MapPin, color: 'text-sky-500', bgColor: 'bg-sky-100' };
-      case 'weather_alert':
-        return { icon: CloudRain, color: 'text-emerald-500', bgColor: 'bg-emerald-100' };
-      case 'weekly_report':
-        return { icon: BarChart3, color: 'text-indigo-500', bgColor: 'bg-indigo-100' };
-      case 'system':
-        return { icon: Bell, color: 'text-amber-500', bgColor: 'bg-amber-100' };
-      default:
-        return { icon: Bell, color: 'text-slate-500', bgColor: 'bg-slate-100' };
-    }
-  };
-
-  const formatNotificationTime = (timestamp: number): string => {
-    const now = Date.now();
-    const diff = now - timestamp;
-
-    if (diff < 60000) {
-      return '刚刚';
-    } else if (diff < 3600000) {
-      return `${Math.floor(diff / 60000)} 分钟前`;
-    } else if (diff < 86400000) {
-      return `${Math.floor(diff / 3600000)} 小时前`;
-    } else {
-      const date = new Date(timestamp);
-      return `${date.getMonth() + 1}/${date.getDate()}`;
-    }
-  };
-
-  const currentHour = new Date().getHours();
-  const timeAxisData = Array.from({ length: 24 }, (_, i) => ({
-    hour: i,
-    count: todayPredictions.reduce((sum, p) => {
-      return sum + p.predictedTimes.filter((t) => t.hour === i).length;
-    }, 0),
-  }));
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -132,6 +41,13 @@ export default function Dashboard() {
     if (hour < 22) return '晚上好';
     return '夜深了';
   };
+
+  const toggleEditMode = () => {
+    setIsEditing(!isEditing);
+  };
+
+  const visibleCount = cards.filter((c) => c.visible).length;
+  const totalCount = cards.length;
 
   return (
     <div className="p-4 space-y-6">
@@ -147,11 +63,7 @@ export default function Dashboard() {
           >
             <SettingsIcon className="w-5 h-5" />
           </button>
-          <VoiceInputButton
-            onResult={handleVoiceRecord}
-            size="md"
-            variant="secondary"
-          />
+          <VoiceInputButton onResult={handleVoiceRecord} size="md" variant="secondary" />
           <button
             onClick={() => navigate('/record')}
             className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
@@ -161,448 +73,69 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <Card className="bg-gradient-to-br from-sky-50 to-blue-50 border-sky-100">
-        <CardContent className="py-4">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-sky-500 flex items-center justify-center shadow-md">
-              <Route className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="font-semibold text-slate-800">路线规避建议</h2>
-              <p className="text-xs text-slate-500">输入起点终点，规划安全出行路线</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-4 h-4 text-emerald-600" />
-              </div>
-              <input
-                type="text"
-                value={origin}
-                onChange={(e) => setOrigin(e.target.value)}
-                placeholder="出发地..."
-                className="flex-1 px-3 py-2 rounded-lg border border-slate-200 bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none text-sm text-slate-800 placeholder-slate-400"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-4 h-4 text-red-600" />
-              </div>
-              <input
-                type="text"
-                value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-                placeholder="目的地..."
-                className="flex-1 px-3 py-2 rounded-lg border border-slate-200 bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 outline-none text-sm text-slate-800 placeholder-slate-400"
-              />
-            </div>
-            <button
-              onClick={() => {
-                const params = new URLSearchParams();
-                if (origin.trim()) params.set('origin', origin.trim());
-                if (destination.trim()) params.set('destination', destination.trim());
-                navigate(`/route?${params.toString()}`);
-              }}
-              disabled={false}
-              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
-            >
-              <Navigation className="w-4 h-4" />
-              规划安全路线
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {shouldShowBanner && latestReport && (
-        <div className="relative">
-          <Card className="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white border-0 overflow-hidden shadow-lg">
-            <button
-              onClick={handleDismissBanner}
-              className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            <CardContent className="py-4">
-              {!showReportDetail ? (
-                <WeeklyReportCard
-                  report={latestReport}
-                  compact
-                  onViewDetail={() => setShowReportDetail(true)}
-                />
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-5 h-5 text-white/80" />
-                      <span className="text-sm text-white/80">
-                        第 {latestReport.weekNumber} 周周报详情
-                      </span>
-                    </div>
-                    <button
-                      onClick={handleViewReportDetail}
-                      className="text-sm text-white/80 hover:text-white flex items-center gap-1"
-                    >
-                      统计页查看
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <WeeklyReportCard report={latestReport} />
-                  <button
-                    onClick={() => setShowReportDetail(false)}
-                    className="w-full py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors"
-                  >
-                    收起详情
-                  </button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Grid3X3 className="w-4 h-4 text-slate-400" />
+          <span className="text-sm text-slate-500">
+            已显示 {visibleCount}/{totalCount} 个卡片
+          </span>
         </div>
-      )}
-
-      {settings.weatherNotificationEnabled && (
-        <Card className={cn(
-          'border-2 overflow-hidden',
-          weatherRisk.borderColor,
-          weatherRisk.bgColor
-        )}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CloudRain className={cn('w-5 h-5', weatherRisk.riskColor)} />
-                <CardTitle>天气预警</CardTitle>
-              </div>
+        <div className="flex items-center gap-2">
+          {isEditing ? (
+            <>
               <button
-                onClick={() => refreshWeather()}
-                disabled={isWeatherLoading}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/50 transition-colors disabled:opacity-50"
+                onClick={toggleEditMode}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 transition-colors"
               >
-                <RefreshCw className={cn('w-4 h-4', isWeatherLoading && 'animate-spin', weatherRisk.riskColor)} />
+                <Check className="w-4 h-4" />
+                完成
               </button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start gap-4">
-              <div className="text-5xl">
-                {isWeatherLoading ? '🌤️' : weatherHint.icon}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xl font-bold text-slate-800">
-                    {isWeatherLoading ? '加载中...' : weatherHint.description}
-                  </span>
-                  <span className={cn(
-                    'px-2 py-0.5 rounded-full text-xs font-medium',
-                    weatherRisk.bgColor,
-                    weatherRisk.riskColor
-                  )}>
-                    {weatherRisk.riskText}
-                  </span>
-                </div>
-                {weather && (
-                  <div className="flex flex-wrap gap-4 text-sm text-slate-600">
-                    <span className="flex items-center gap-1">
-                      🌡️ {weather.temperature}°C
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <DropletsIcon className="w-3.5 h-3.5" />
-                      {weather.humidity}%
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Wind className="w-3.5 h-3.5" />
-                      {weather.windSpeed}km/h
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-white/60 rounded-xl p-4 backdrop-blur-sm">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className={cn('w-5 h-5 flex-shrink-0 mt-0.5', weatherRisk.riskColor)} />
-                <div>
-                  <p className={cn('font-medium mb-1', weatherRisk.riskColor)}>
-                    {weatherHint.hint}
-                  </p>
-                  <p className="text-sm text-slate-600">
-                    {weatherRisk.description}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {settings.reminderEnabled && upcomingReminders.length > 0 && (
-        <Card gradient className="overflow-hidden">
-          <CardHeader className="border-b border-white/20">
-            <div className="flex items-center gap-2">
-              <Bell className="w-5 h-5 animate-pulse" />
-              <CardTitle className="text-white">即将提醒</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {upcomingReminders.slice(0, 2).map((reminder, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between bg-white/10 rounded-xl p-3 backdrop-blur-sm"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                    <AlertTriangle className="w-5 h-5 text-yellow-300" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-white">{reminder.road}</p>
-                    <p className="text-sm text-sky-100">预计 {reminder.time} 经过</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xl font-bold text-white">{reminder.minutesLeft}</p>
-                  <p className="text-xs text-sky-100">分钟后</p>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {notifications.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-rose-500 flex items-center justify-center shadow-md">
-                  <Bell className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-slate-800">最近通知</CardTitle>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {unreadCount > 0 ? `${unreadCount} 条未读` : '全部已读'}
-                  </p>
-                </div>
-              </div>
               <button
-                onClick={handleViewAllNotifications}
-                className="text-rose-600 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all px-3 py-1.5 rounded-lg hover:bg-rose-50"
+                onClick={() => setShowCardSelector(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-500 text-white text-sm font-medium hover:bg-sky-600 transition-colors"
               >
-                全部
-                <ChevronRight className="w-4 h-4" />
+                <Grid3X3 className="w-4 h-4" />
+                管理卡片
               </button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {notifications.slice(0, 3).map((notification) => {
-              const { icon: Icon, color, bgColor } = getNotificationIcon(notification.type);
-              return (
-                <div
-                  key={notification.id}
-                  onClick={() => handleNotificationClick(notification.id)}
-                  className={cn(
-                    'flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors',
-                    notification.read ? 'bg-white' : 'bg-rose-50/50'
-                  )}
-                >
-                  <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', bgColor)}>
-                    <Icon className={cn('w-5 h-5', color)} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className={cn(
-                        'text-sm font-medium truncate',
-                        notification.read ? 'text-slate-600' : 'text-slate-800'
-                      )}>
-                        {notification.title}
-                      </p>
-                      {!notification.read && (
-                        <span className="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0 mt-1.5" />
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                      {notification.content}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1.5">
-                      {formatNotificationTime(notification.timestamp)}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
-
-      {favoritePredictions.length > 0 && (
-        <Card className="border-2 border-amber-200 bg-gradient-to-br from-amber-50/80 to-orange-50/50">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center shadow-md">
-                  <Star className="w-5 h-5 text-white fill-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-slate-800">收藏路段预测</CardTitle>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    共 {favoritePredictions.length} 个收藏路段
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => navigate('/schedule')}
-                className="text-amber-600 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all px-3 py-1.5 rounded-lg hover:bg-amber-100/50"
-              >
-                管理
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {favoritePredictions.map((prediction) => (
-              <PredictionCard
-                key={prediction.roadName}
-                prediction={prediction}
-                highlight={false}
-                onClick={() => navigate('/schedule')}
-              />
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-3 gap-3">
-        <Card hover className="text-center">
-          <CardContent className="py-5">
-            <div className="w-12 h-12 mx-auto rounded-xl bg-sky-100 flex items-center justify-center mb-2">
-              <Droplets className="w-6 h-6 text-sky-600" />
-            </div>
-            <p className="text-2xl font-bold text-slate-800">{splashStats.total}</p>
-            <p className="text-xs text-slate-500 mt-1">总记录</p>
-          </CardContent>
-        </Card>
-        <Card hover className="text-center">
-          <CardContent className="py-5">
-            <div className="w-12 h-12 mx-auto rounded-xl bg-orange-100 flex items-center justify-center mb-2">
-              <AlertTriangle className="w-6 h-6 text-orange-500" />
-            </div>
-            <p className="text-2xl font-bold text-slate-800">{splashStats.splashed}</p>
-            <p className="text-xs text-slate-500 mt-1">被溅次数</p>
-          </CardContent>
-        </Card>
-        <Card hover className="text-center">
-          <CardContent className="py-5">
-            <div className="w-12 h-12 mx-auto rounded-xl bg-emerald-100 flex items-center justify-center mb-2">
-              <Droplets className="w-6 h-6 text-emerald-600" />
-            </div>
-            <p className="text-2xl font-bold text-slate-800">
-              {Math.round(splashStats.rate * 100)}%
-            </p>
-            <p className="text-xs text-slate-500 mt-1">溅水率</p>
-          </CardContent>
-        </Card>
+            </>
+          ) : (
+            <button
+              onClick={toggleEditMode}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-colors"
+            >
+              <Edit3 className="w-4 h-4" />
+              编辑布局
+            </button>
+          )}
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>今日 24 小时分布</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TimeAxis data={timeAxisData} />
-        </CardContent>
-      </Card>
-
-      {todayPredictions.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-slate-800">今日预测路段</h2>
-            <button
-              onClick={() => navigate('/schedule')}
-              className="text-sky-600 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all"
-            >
-              查看全部
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="space-y-3">
-            {todayPredictions.slice(0, 3).map((prediction) => (
-              <PredictionCard
-                key={prediction.roadName}
-                prediction={prediction}
-                onClick={() => navigate('/schedule')}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {recentRecords.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-slate-800">最近记录</h2>
-            <button
-              onClick={() => navigate('/history')}
-              className="text-sky-600 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all"
-            >
-              查看全部
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="space-y-3">
-            {recentRecords.slice(0, 3).map((record) => (
-              <RecordCard
-                key={record.id}
-                record={record}
-                showActions={false}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {todayPredictions.length === 0 && recentRecords.length === 0 && (
-        <Card>
-          <CardContent className="text-center py-12">
-            <div className="w-20 h-20 mx-auto rounded-full bg-sky-100 flex items-center justify-center mb-4">
-              <Droplets className="w-10 h-10 text-sky-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">还没有记录</h3>
-            <p className="text-slate-500 text-sm mb-6">开始记录洒水车出没，积累数据后就能生成预测啦</p>
-            <Button onClick={() => navigate('/record')} size="lg">
-              <Plus className="w-5 h-5" />
-              记录第一次
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {settings.reminderEnabled && upcomingReminders.length > 0 && (
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4">
+      {isEditing && (
+        <div className="bg-sky-50 border border-sky-200 rounded-xl p-4">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-              <Bell className="w-5 h-5 text-amber-600" />
+            <div className="w-8 h-8 rounded-lg bg-sky-100 flex items-center justify-center flex-shrink-0">
+              <Edit3 className="w-4 h-4 text-sky-600" />
             </div>
-            <div className="flex-1">
-              <p className="font-medium text-amber-800 mb-1">出行提醒</p>
-              <p className="text-sm text-amber-700">
-                未来 {settings.reminderMinutes * 2} 分钟内有 {upcomingReminders.length} 个路段可能遇到洒水车，注意避开！
+            <div>
+              <p className="font-medium text-sky-800">编辑模式已开启</p>
+              <p className="text-sm text-sky-600 mt-1">
+                拖拽卡片左侧的手柄可以调整顺序，点击卡片右上角的眼睛图标可以隐藏卡片。
               </p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                {upcomingReminders.slice(0, 3).map((r, idx) => (
-                  <span
-                    key={idx}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white text-xs font-medium text-amber-700"
-                  >
-                    {r.road} {r.time}
-                    <span className={`${getConfidenceColor(r.confidence)}`}>
-                      ({getConfidenceLabel(r.confidence)})
-                    </span>
-                  </span>
-                ))}
-              </div>
             </div>
+            <button
+              onClick={toggleEditMode}
+              className="ml-auto w-8 h-8 rounded-lg bg-sky-100 hover:bg-sky-200 flex items-center justify-center transition-colors"
+            >
+              <X className="w-4 h-4 text-sky-600" />
+            </button>
           </div>
         </div>
+      )}
+
+      <DraggableCardGrid cards={cards} />
+
+      {showCardSelector && (
+        <CardSelector cards={cards} onClose={() => setShowCardSelector(false)} />
       )}
     </div>
   );

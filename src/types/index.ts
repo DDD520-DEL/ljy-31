@@ -261,7 +261,155 @@ export enum StorageKeys {
   COMMUNITY_RECORDS = 'sprinkler_community_records',
   COMMUNITY_SYNCED_IDS = 'sprinkler_community_synced_ids',
   ROUTE_LIBRARY = 'sprinkler_route_library',
+  DASHBOARD_CARDS = 'sprinkler_dashboard_cards',
 }
+
+export type WidgetType =
+  | 'monthlySplashRate'
+  | 'consecutiveSafeDays'
+  | 'mostDangerousRoads'
+  | 'todayPredictionOverview'
+  | 'splashStats'
+  | 'recentRecords'
+  | 'weatherAlert'
+  | 'upcomingReminders'
+  | 'routePlanner'
+  | 'weeklyReport'
+  | 'favoriteRoads'
+  | 'recentNotifications'
+  | 'timeAxis';
+
+export interface WidgetConfig {
+  type: WidgetType;
+  title: string;
+  description: string;
+  icon: string;
+  defaultVisible: boolean;
+  size: 'small' | 'medium' | 'large';
+}
+
+export interface CardLayout {
+  type: WidgetType;
+  visible: boolean;
+  order: number;
+}
+
+export interface DashboardCardState {
+  cards: CardLayout[];
+  isEditing: boolean;
+  setCards: (cards: CardLayout[]) => void;
+  toggleCardVisibility: (type: WidgetType) => void;
+  reorderCards: (fromIndex: number, toIndex: number) => void;
+  setIsEditing: (isEditing: boolean) => void;
+  resetToDefault: () => void;
+}
+
+export const WIDGET_CONFIGS: Record<WidgetType, WidgetConfig> = {
+  monthlySplashRate: {
+    type: 'monthlySplashRate',
+    title: '本月溅水率',
+    description: '显示本月的溅水率统计和趋势',
+    icon: 'Droplets',
+    defaultVisible: true,
+    size: 'small',
+  },
+  consecutiveSafeDays: {
+    type: 'consecutiveSafeDays',
+    title: '连续安全天数',
+    description: '统计连续未被溅水的天数',
+    icon: 'Shield',
+    defaultVisible: true,
+    size: 'small',
+  },
+  mostDangerousRoads: {
+    type: 'mostDangerousRoads',
+    title: '最危险路段排行',
+    description: '显示溅水率最高的路段排名',
+    icon: 'AlertTriangle',
+    defaultVisible: true,
+    size: 'medium',
+  },
+  todayPredictionOverview: {
+    type: 'todayPredictionOverview',
+    title: '今日预测概览',
+    description: '今日洒水车出没预测汇总',
+    icon: 'Calendar',
+    defaultVisible: true,
+    size: 'medium',
+  },
+  splashStats: {
+    type: 'splashStats',
+    title: '溅水统计',
+    description: '总记录、被溅次数、溅水率统计',
+    icon: 'BarChart3',
+    defaultVisible: true,
+    size: 'small',
+  },
+  recentRecords: {
+    type: 'recentRecords',
+    title: '最近记录',
+    description: '最近的洒水车出没记录',
+    icon: 'Clock',
+    defaultVisible: true,
+    size: 'large',
+  },
+  weatherAlert: {
+    type: 'weatherAlert',
+    title: '天气预警',
+    description: '当前天气和出行建议',
+    icon: 'CloudRain',
+    defaultVisible: true,
+    size: 'medium',
+  },
+  upcomingReminders: {
+    type: 'upcomingReminders',
+    title: '即将提醒',
+    description: '即将经过的洒水车提醒',
+    icon: 'Bell',
+    defaultVisible: true,
+    size: 'medium',
+  },
+  routePlanner: {
+    type: 'routePlanner',
+    title: '路线规避建议',
+    description: '输入起点终点规划安全路线',
+    icon: 'Route',
+    defaultVisible: true,
+    size: 'large',
+  },
+  weeklyReport: {
+    type: 'weeklyReport',
+    title: '周报提醒',
+    description: '最新的周度分析报告',
+    icon: 'FileText',
+    defaultVisible: true,
+    size: 'medium',
+  },
+  favoriteRoads: {
+    type: 'favoriteRoads',
+    title: '收藏路段预测',
+    description: '收藏路段的洒水车预测',
+    icon: 'Star',
+    defaultVisible: true,
+    size: 'large',
+  },
+  recentNotifications: {
+    type: 'recentNotifications',
+    title: '最近通知',
+    description: '最近的系统通知消息',
+    icon: 'Bell',
+    defaultVisible: true,
+    size: 'large',
+  },
+  timeAxis: {
+    type: 'timeAxis',
+    title: '今日24小时分布',
+    description: '今日洒水车出没时间分布',
+    icon: 'Clock',
+    defaultVisible: true,
+    size: 'large',
+  },
+};
 
 export type SearchResultType = 'road' | 'record' | 'statistic';
 
