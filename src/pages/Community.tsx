@@ -32,6 +32,7 @@ import {
   useRefreshCommunityRoadStats,
   useRefreshContributionStats,
   useRecords,
+  useCommunityRecords,
 } from '../store/useAppStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
 import { Button } from '../components/Button';
@@ -50,6 +51,7 @@ export default function Community() {
   const refreshCommunityRoadStats = useRefreshCommunityRoadStats();
   const refreshContributionStats = useRefreshContributionStats();
   const records = useRecords();
+  const communityRecords = useCommunityRecords();
 
   const [showShareConfirm, setShowShareConfirm] = useState(false);
   const [shareResult, setShareResult] = useState<{ show: boolean; count: number }>({
@@ -69,11 +71,13 @@ export default function Community() {
 
   const totalContributors = useMemo(() => {
     const uniqueContributors = new Set<string>();
-    communityRoadStats.forEach((s) => {
-      uniqueContributors.add(s.roadName);
+    communityRecords.forEach((r) => {
+      if (r.contributorId && r.contributorId !== 'anonymous') {
+        uniqueContributors.add(r.contributorId);
+      }
     });
-    return Math.max(uniqueContributors.size, 50);
-  }, [communityRoadStats]);
+    return uniqueContributors.size;
+  }, [communityRecords]);
 
   const handleEnableCommunity = () => {
     updateCommunitySettings({ enabled: true, useCommunityData: true });

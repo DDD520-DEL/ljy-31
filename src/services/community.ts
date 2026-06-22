@@ -210,7 +210,9 @@ export const communityService = {
       };
       existing.total++;
       if (record.isSplashed) existing.splashed++;
-      if (record.contributorId) existing.contributors.add(record.contributorId);
+      if (record.contributorId && record.contributorId !== 'anonymous') {
+        existing.contributors.add(record.contributorId);
+      }
       if (record.timestamp > existing.lastAt) existing.lastAt = record.timestamp;
       roadMap.set(record.road, existing);
     });
