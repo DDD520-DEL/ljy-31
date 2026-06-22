@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Droplets, MapPin, Clock, MessageSquare, Check, X, ArrowLeft, Camera, Sparkles, BookOpen, Tag, Navigation } from 'lucide-react';
+import { Droplets, MapPin, Clock, MessageSquare, Check, X, ArrowLeft, Camera, Sparkles, BookOpen, Tag, Navigation, Mic } from 'lucide-react';
 import { useAddRecord, useUpdateRecord, useRecords, useAddPhoto, useGetPhotosByRecordId, usePhotos, useAppStore, useDeletePhoto, useUpdatePhoto, useRouteLibrary } from '../store/useAppStore';
 import { useRoadList } from '../hooks/usePredictions';
 import { Button } from '../components/Button';
@@ -9,6 +9,8 @@ import { formatDate, formatTime, parseTimeString, getDayOfWeek, generateId } fro
 import { cn } from '../lib/utils';
 import PhotoUploader, { TempPhoto } from '../components/PhotoUploader';
 import PhotoViewer from '../components/PhotoViewer';
+import VoiceInputButton from '../components/VoiceInputButton';
+import { ParsedSpeechResult } from '../utils/speechParser';
 import { Photo, OCRResult } from '../types';
 
 const directions = [
@@ -58,6 +60,8 @@ export default function Record() {
   const [showRoadSuggestions, setShowRoadSuggestions] = useState(false);
   const [showRouteLibrary, setShowRouteLibrary] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [speechResult, setSpeechResult] = useState<ParsedSpeechResult | null>(null);
+  const [showSpeechConfirm, setShowSpeechConfirm] = useState(false);
 
   const [tempPhotos, setTempPhotos] = useState<TempPhoto[]>(
     existingPhotos.map((p) => ({ ...p, tempId: p.id }))
@@ -69,6 +73,23 @@ export default function Record() {
   const filteredRoads = roadList.filter(
     (r) => r.toLowerCase().includes(road.toLowerCase()) && r !== road
   );
+
+  useEffect(() => {
+    if (!isEditing) {
+      const voiceData = sessionStorage.getItem('voiceRecordData');
+      if (voiceData) {
+        try {
+          const parsed = JSON.parse(voiceData) as ParsedSpeechResult;
+          setSpeechResult(parsed);
+          setShowSpeechConfirm(true);
+        } catch (e) {
+          console.error('Failed to parse voice data', e);
+        } finally {
+          sessionStorage.removeItem('voiceRecordData');
+        }
+      }
+    }
+  }, [isEditing]);
 
   const handleOCRResult = (index: number, result: OCRResult) => {
     if (result.confidence < 0.5) return;
@@ -94,6 +115,39 @@ export default function Record() {
     if (applied) {
       setOcrApplied((prev) => new Set(prev).add(photo.tempId));
     }
+  };
+
+  const handleSpeechResult = (result: ParsedSpeechResult) => {
+    setSpeechResult(result);
+    setShowSpeechConfirm(true);
+  };
+
+  const applySpeechResult = () => {
+    if (!speechResult) return;
+
+    if (speechResult.date) {
+      setDate(speechResult.date);
+    }
+    if (speechResult.time) {
+      setTime(speechResult.time);
+    }
+    if (speechResult.road) {
+      setRoad(speechResult.road);
+    }
+    if (speechResult.isSplashed !== undefined) {
+      setIsSplashed(speechResult.isSplashed);
+    }
+    if (speechResult.rawText && !note) {
+      setNote(speechResult.rawText);
+    }
+
+    setShowSpeechConfirm(false);
+    setSpeechResult(null);
+  };
+
+  const cancelSpeechResult = () => {
+    setShowSpeechConfirm(false);
+    setSpeechResult(null);
   };
 
   const viewerPhotos: Photo[] = tempPhotos.map((p) => ({
@@ -201,6 +255,13 @@ export default function Record() {
         <h1 className="text-xl font-bold text-slate-800">
           {isEditing ? '编辑记录' : '记录洒水车'}
         </h1>
+        <div className="ml-auto">
+          <VoiceInputButton
+            onResult={handleSpeechResult}
+            size="md"
+            variant="primary"
+          />
+        </div>
       </div>
 
       <Card>
@@ -450,6 +511,75 @@ export default function Record() {
           {isEditing ? '保存修改' : '提交记录'}
         </Button>
       </div>
+
+      {showSpeechConfirm && speechResult && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-sky-100 flex items-center justify-center">
+                  <Mic className="w-6 h-6 text-sky-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">语音识别结果</h3>
+                  <p className="text-sm text-slate-500">确认以下信息是否正确</p>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                <p className="text-sm text-slate-600 italic">"{speechResult.rawText}"</p>
+              </div>
+
+              <div className="space-y-3">
+                {speechResult.date && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-500">日期</span>
+                    <span className="text-sm font-medium text-slate-800">{speechResult.date}</span>
+                  </div>
+                )}
+                {speechResult.time && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-500">时间</span>
+                    <span className="text-sm font-medium text-slate-800">{speechResult.time}</span>
+                  </div>
+                )}
+                {speechResult.road && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-500">路段</span>
+                    <span className="text-sm font-medium text-slate-800">{speechResult.road}</span>
+                  </div>
+                )}
+                {speechResult.isSplashed !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-500">是否被溅到</span>
+                    <span className={cn(
+                      'text-sm font-medium',
+                      speechResult.isSplashed ? 'text-orange-600' : 'text-emerald-600'
+                    )}>
+                      {speechResult.isSplashed ? '被溅到了' : '没被溅到'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 p-4 flex gap-3">
+              <button
+                onClick={cancelSpeechResult}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={applySpeechResult}
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-medium hover:opacity-90 transition-opacity"
+              >
+                确认填入
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {viewerOpen && (
         <PhotoViewer

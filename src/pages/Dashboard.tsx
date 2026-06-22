@@ -24,6 +24,8 @@ import PredictionCard from '../components/PredictionCard';
 import RecordCard from '../components/RecordCard';
 import TimeAxis from '../components/TimeAxis';
 import WeeklyReportCard from '../components/WeeklyReportCard';
+import VoiceInputButton from '../components/VoiceInputButton';
+import { ParsedSpeechResult } from '../utils/speechParser';
 import { getConfidenceLabel, getConfidenceColor } from '../utils/format';
 import { cn } from '../lib/utils';
 
@@ -45,6 +47,11 @@ export default function Dashboard() {
   const [showReportDetail, setShowReportDetail] = useState(false);
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
+
+  const handleVoiceRecord = (result: ParsedSpeechResult) => {
+    sessionStorage.setItem('voiceRecordData', JSON.stringify(result));
+    navigate('/record');
+  };
 
   const notifications = useNotifications();
   const unreadCount = useUnreadCount();
@@ -140,6 +147,11 @@ export default function Dashboard() {
           >
             <SettingsIcon className="w-5 h-5" />
           </button>
+          <VoiceInputButton
+            onResult={handleVoiceRecord}
+            size="md"
+            variant="secondary"
+          />
           <button
             onClick={() => navigate('/record')}
             className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
